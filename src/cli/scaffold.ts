@@ -97,11 +97,11 @@ export async function scaffoldProject(targetDir: string, options: ScaffoldOption
 export default {
     default: {
         override: {
-            wrapper: () => import("${targetDir}/node_modules/opennext-azure/dist/adapters/wrappers/azure-functions.js").then(m => m.default),
-            converter: () => import("${targetDir}/node_modules/opennext-azure/dist/adapters/converters/azure-http.js").then(m => m.default),
-            incrementalCache: () => import("${targetDir}/node_modules/opennext-azure/dist/overrides/incrementalCache/azure-blob.js").then(m => new m.default()),
-            tagCache: () => import("${targetDir}/node_modules/opennext-azure/dist/overrides/tagCache/azure-table.js").then(m => new m.default()),
-            queue: () => import("${targetDir}/node_modules/opennext-azure/dist/overrides/queue/azure-queue.js").then(m => new m.default()),
+            wrapper: () => import("./node_modules/opennext-azure/dist/adapters/wrappers/azure-functions.js").then(m => m.default),
+            converter: () => import("./node_modules/opennext-azure/dist/adapters/converters/azure-http.js").then(m => m.default),
+            incrementalCache: () => import("./node_modules/opennext-azure/dist/overrides/incrementalCache/azure-blob.js").then(m => new m.default()),
+            tagCache: () => import("./node_modules/opennext-azure/dist/overrides/tagCache/azure-table.js").then(m => new m.default()),
+            queue: () => import("./node_modules/opennext-azure/dist/overrides/queue/azure-queue.js").then(m => new m.default()),
             proxyExternalRequest: "fetch",
         },
         routePreloadingBehavior: "none",
