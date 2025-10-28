@@ -51,7 +51,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
         if (!skipInfrastructure) {
             // Sync bicep template from package (ensures infrastructure matches package version)
             await syncBicepTemplate();
-            
+
             console.log("Provisioning Azure infrastructure...");
             console.log(`  Resource Group: ${resourceGroup}`);
             console.log(`  Location: ${location}`);
@@ -387,7 +387,7 @@ async function syncBicepTemplate(): Promise<void> {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
     const packageBicepPath = path.join(currentDir, "../infrastructure/main.bicep");
     const projectBicepPath = path.join(process.cwd(), "infrastructure/main.bicep");
-    
+
     const bicepContent = await fs.readFile(packageBicepPath, "utf-8");
     await fs.mkdir(path.dirname(projectBicepPath), { recursive: true });
     await fs.writeFile(projectBicepPath, bicepContent);
