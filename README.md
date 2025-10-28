@@ -1,5 +1,9 @@
 # OpenNext.js Azure
 
+[![NPM Version](https://img.shields.io/npm/v/opennextjs-azure)](https://www.npmjs.com/package/opennextjs-azure)
+[![NPM Downloads](https://img.shields.io/npm/dt/opennextjs-azure)](https://www.npmjs.com/package/opennextjs-azure)
+[![License: MIT](https://img.shields.io/npm/l/opennextjs-azure)](https://opensource.org/licenses/MIT)
+
 **True serverless Next.js on Azure Functions with ISR, streaming SSR, and on-demand revalidation.**
 
 Built on the [OpenNext](https://opennext.js.org) framework, this adapter brings native Next.js support to Azure Functions. No compromises—full ISR, streaming responses, and production-ready infrastructure.
@@ -21,6 +25,8 @@ Azure Functions is Microsoft's serverless compute platform—comparable to AWS L
 | Infrastructure                         | Complete Bicep templates (Y1 Consumption for dev, EP1 Premium for prod) |
 
 ## Quick Start
+
+(Oops, we unpublished from NPM to clean up some test releases and its a 24hour wait to republish on same name. so for today its `opennext-azure` as the name for now.)
 
 ```bash
 # Install globally or use npx

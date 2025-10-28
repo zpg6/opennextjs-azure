@@ -102,7 +102,7 @@ class AzureTableTagCache implements OriginalTagCache {
             const queryKey = this.buildKey(path);
             const entities = this.tableClient.listEntities({
                 queryOptions: {
-                    filter: `RowKey eq '${queryKey}' and RevalidatedAt gt ${lastModified ?? 0}`,
+                    filter: `RowKey eq '${queryKey}' and RevalidatedAt gt ${lastModified ?? 0}L`,
                 },
             });
 

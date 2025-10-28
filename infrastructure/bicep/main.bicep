@@ -202,5 +202,6 @@ output deploymentInfo object = {
   queueName: queueName
   assetsUrl: 'https://${storageAccount.name}.blob.${az.environment().suffixes.storage}/assets'
   functionUrl: 'https://${functionApp.properties.defaultHostName}'
+  appUrl: 'https://${functionApp.properties.defaultHostName}'
 }
 
