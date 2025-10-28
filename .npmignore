@@ -1,0 +1,12 @@
+src/
+infrastructure/
+examples/
+*.md
+!README.md
+tsconfig.json
+build.config.ts
+.eslintrc.json
+.gitignore
+pnpm-lock.yaml
+node_modules/
+

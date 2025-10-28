@@ -1,0 +1,98 @@
+{
+    "name": "opennextjs-azure",
+    "version": "0.1.0-test.36",
+    "description": "Azure adapter for Next.js applications using OpenNext",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "bin": {
+        "opennextjs-azure": "./dist/cli/index.js"
+    },
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./package.json": "./package.json",
+        "./config/index.js": {
+            "import": "./dist/config/index.js",
+            "types": "./dist/config/index.d.ts"
+        },
+        "./adapters/wrappers/azure-functions.js": {
+            "import": "./dist/adapters/wrappers/azure-functions.js",
+            "types": "./dist/adapters/wrappers/azure-functions.d.ts"
+        },
+        "./adapters/converters/azure-http.js": {
+            "import": "./dist/adapters/converters/azure-http.js",
+            "types": "./dist/adapters/converters/azure-http.d.ts"
+        },
+        "./overrides/incrementalCache/azure-blob.js": {
+            "import": "./dist/overrides/incrementalCache/azure-blob.js",
+            "types": "./dist/overrides/incrementalCache/azure-blob.d.ts"
+        },
+        "./overrides/tagCache/azure-table.js": {
+            "import": "./dist/overrides/tagCache/azure-table.js",
+            "types": "./dist/overrides/tagCache/azure-table.d.ts"
+        },
+        "./overrides/queue/azure-queue.js": {
+            "import": "./dist/overrides/queue/azure-queue.js",
+            "types": "./dist/overrides/queue/azure-queue.d.ts"
+        }
+    },
+    "files": [
+        "dist",
+        "infrastructure"
+    ],
+    "scripts": {
+        "build": "unbuild",
+        "dev": "unbuild --stub",
+        "clean": "rimraf dist",
+        "lint": "eslint src --ext .ts",
+        "test": "vitest",
+        "typecheck": "tsc --noEmit",
+        "format": "prettier --write ."
+    },
+    "keywords": [
+        "nextjs",
+        "azure",
+        "serverless",
+        "azure-functions",
+        "opennext"
+    ],
+    "author": "",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zpg6/opennextjs-azure"
+    },
+    "bugs": {
+        "url": "https://github.com/zpg6/opennextjs-azure/issues"
+    },
+    "homepage": "https://opennext.js.org/azure",
+    "dependencies": {
+        "@opennextjs/aws": "^3.8.5",
+        "@azure/functions": "^4.5.1",
+        "@azure/storage-blob": "^12.20.0",
+        "@azure/data-tables": "^13.2.2",
+        "@azure/storage-queue": "^12.18.0",
+        "commander": "^11.1.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "@typescript-eslint/eslint-plugin": "^6.20.0",
+        "@typescript-eslint/parser": "^6.20.0",
+        "eslint": "^8.56.0",
+        "rimraf": "^5.0.5",
+        "prettier": "^3.5.3",
+        "typescript": "^5.3.3",
+        "unbuild": "^2.0.0",
+        "vitest": "^1.2.0"
+    },
+    "peerDependencies": {
+        "next": ">=13.4.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

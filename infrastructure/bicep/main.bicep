@@ -1,0 +1,206 @@
+// OpenNext Azure - Main Infrastructure Template
+// This creates all resources needed to run a Next.js app on Azure
+
+@description('Name of the application (used as prefix for all resources)')
+param appName string
+
+@description('Location for all resources')
+param location string = resourceGroup().location
+
+@description('Environment (dev, staging, prod)')
+@allowed(['dev', 'staging', 'prod'])
+param environment string = 'dev'
+
+@description('Node.js version for Functions')
+@allowed(['20', '22'])
+param nodeVersion string = '20'
+
+// Variables
+var uniqueSuffix = uniqueString(resourceGroup().id)
+var sanitizedAppName = replace(toLower(appName), '-', '')
+var maxAppNameLength = 24 - length(uniqueSuffix)
+var truncatedAppName = length(sanitizedAppName) > maxAppNameLength ? substring(sanitizedAppName, 0, maxAppNameLength) : sanitizedAppName
+var storageAccountName = '${truncatedAppName}${uniqueSuffix}'
+var functionAppName = '${appName}-func-${environment}'
+var appServicePlanName = '${appName}-plan-${environment}'
+var containerName = 'nextjs-cache'
+var tableName = 'nextjstags'
+var queueName = 'nextjsrevalidation'
+
+// Storage Account (for cache, static assets, and function storage)
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: storageAccountName
+  location: location
+  sku: {
+    name: environment == 'prod' ? 'Standard_GRS' : 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    allowBlobPublicAccess: true
+    accessTier: 'Hot'
+  }
+
+  // Blob service for cache and static assets
+  resource blobService 'blobServices' = {
+    name: 'default'
+    properties: {
+      cors: {
+        corsRules: [
+          {
+            allowedOrigins: ['*']
+            allowedMethods: ['GET', 'HEAD']
+            maxAgeInSeconds: 3600
+            exposedHeaders: ['*']
+            allowedHeaders: ['*']
+          }
+        ]
+      }
+    }
+
+    // Container for Next.js cache
+    resource cacheContainer 'containers' = {
+      name: containerName
+      properties: {
+        publicAccess: 'None'
+      }
+    }
+
+    // Container for static assets (public CDN access)
+    resource assetsContainer 'containers' = {
+      name: 'assets'
+      properties: {
+        publicAccess: 'Blob'
+      }
+    }
+  }
+
+  // Table service for tag cache
+  resource tableService 'tableServices' = {
+    name: 'default'
+    
+    resource tagTable 'tables' = {
+      name: tableName
+    }
+  }
+
+  // Queue service for ISR revalidation (revalidateTag/revalidatePath)
+  resource queueService 'queueServices' = {
+    name: 'default'
+    
+    resource revalidationQueue 'queues' = {
+      name: queueName
+    }
+  }
+}
+
+// App Service Plan (Consumption or Premium based on environment)
+resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
+  name: appServicePlanName
+  location: location
+  sku: {
+    name: environment == 'prod' ? 'EP1' : 'Y1' // EP1 = Premium, Y1 = Consumption
+    tier: environment == 'prod' ? 'ElasticPremium' : 'Dynamic'
+  }
+  kind: 'functionapp'
+  properties: {
+    reserved: true // Linux
+  }
+}
+
+// Function App
+resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
+  name: functionAppName
+  location: location
+  kind: 'functionapp,linux'
+  properties: {
+    serverFarmId: appServicePlan.id
+    siteConfig: {
+      linuxFxVersion: 'NODE|${nodeVersion}'
+      appSettings: [
+        {
+          name: 'AzureWebJobsStorage'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+        }
+        {
+          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+        }
+        {
+          name: 'WEBSITE_CONTENTSHARE'
+          value: toLower(functionAppName)
+        }
+        {
+          name: 'FUNCTIONS_EXTENSION_VERSION'
+          value: '~4'
+        }
+        {
+          name: 'FUNCTIONS_WORKER_RUNTIME'
+          value: 'node'
+        }
+        {
+          name: 'WEBSITE_NODE_DEFAULT_VERSION'
+          value: '~${nodeVersion}'
+        }
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          value: '1'
+        }
+        {
+          name: 'AzureWebJobsDisableHomepage'
+          value: 'true'
+        }
+        // Next.js / OpenNext environment variables
+        {
+          name: 'AZURE_STORAGE_CONNECTION_STRING'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+        }
+        {
+          name: 'AZURE_STORAGE_ACCOUNT_NAME'
+          value: storageAccountName
+        }
+        {
+          name: 'AZURE_STORAGE_CONTAINER_NAME'
+          value: containerName
+        }
+        {
+          name: 'AZURE_TABLE_NAME'
+          value: tableName
+        }
+        {
+          name: 'AZURE_QUEUE_NAME'
+          value: queueName
+        }
+        {
+          name: 'NODE_ENV'
+          value: 'production'
+        }
+      ]
+      ftpsState: 'Disabled'
+      minTlsVersion: '1.2'
+      cors: {
+        allowedOrigins: ['*']
+      }
+    }
+    httpsOnly: true
+  }
+}
+
+// Outputs
+output functionAppName string = functionApp.name
+output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
+output storageAccountName string = storageAccount.name
+output assetsUrl string = 'https://${storageAccount.name}.blob.${az.environment().suffixes.storage}/assets'
+output resourceGroupName string = resourceGroup().name
+
+output deploymentInfo object = {
+  functionApp: functionAppName
+  storageAccount: storageAccountName
+  containerName: containerName
+  tableName: tableName
+  queueName: queueName
+  assetsUrl: 'https://${storageAccount.name}.blob.${az.environment().suffixes.storage}/assets'
+  functionUrl: 'https://${functionApp.properties.defaultHostName}'
+}
+
