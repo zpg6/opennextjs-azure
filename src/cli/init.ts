@@ -91,7 +91,7 @@ async function promptUser(question: string): Promise<string> {
 
 async function getBicepTemplate(): Promise<string> {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
-    const templatePath = path.join(currentDir, "../infrastructure/bicep/main.bicep");
+    const templatePath = path.join(currentDir, "../infrastructure/main.bicep");
     return await fs.readFile(templatePath, "utf-8");
 }
 function getAzureConfigTemplate(): string {

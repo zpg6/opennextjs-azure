@@ -49,6 +49,9 @@ export async function deploy(options: DeployOptions): Promise<void> {
         // Step 1: Provision infrastructure (or skip if updating app only)
         let deploymentOutputs;
         if (!skipInfrastructure) {
+            // Sync bicep template from package (ensures infrastructure matches package version)
+            await syncBicepTemplate();
+            
             console.log("Provisioning Azure infrastructure...");
             console.log(`  Resource Group: ${resourceGroup}`);
             console.log(`  Location: ${location}`);
@@ -376,6 +379,18 @@ async function performPostflightChecks(
         console.log(`\n${colors.green}✓${colors.reset} Deployment completed, but some post-flight checks failed.`);
         console.log(`  View resources: az resource list --resource-group ${resourceGroup} -o table\n`);
     }
+}
+
+async function syncBicepTemplate(): Promise<void> {
+    // Sync infrastructure/main.bicep from package to ensure it matches this version
+    const { fileURLToPath } = await import("node:url");
+    const currentDir = path.dirname(fileURLToPath(import.meta.url));
+    const packageBicepPath = path.join(currentDir, "../infrastructure/main.bicep");
+    const projectBicepPath = path.join(process.cwd(), "infrastructure/main.bicep");
+    
+    const bicepContent = await fs.readFile(packageBicepPath, "utf-8");
+    await fs.mkdir(path.dirname(projectBicepPath), { recursive: true });
+    await fs.writeFile(projectBicepPath, bicepContent);
 }
 
 async function provisionInfrastructure(options: {
