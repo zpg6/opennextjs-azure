@@ -1,6 +1,6 @@
 {
     "name": "opennext-azure",
-    "version": "0.1.15",
+    "version": "0.1.23",
     "description": "Azure adapter for Next.js applications using OpenNext",
     "type": "module",
     "main": "./dist/index.js",
@@ -85,6 +85,7 @@
         "eslint": "^8.56.0",
         "rimraf": "^5.0.5",
         "prettier": "^3.5.3",
+        "prettier-plugin-tailwindcss": "^0.5.0",
         "typescript": "^5.3.3",
         "unbuild": "^2.0.0",
         "vitest": "^1.2.0"

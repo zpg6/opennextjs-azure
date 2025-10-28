@@ -96,7 +96,7 @@ async function getBicepTemplate(): Promise<string> {
 }
 function getAzureConfigTemplate(): string {
     return `{
-  "$schema": "./node_modules/opennextjs-azure/azure.config.schema.json",
+  "$schema": "./node_modules/opennext-azure/azure.config.schema.json",
   "appName": "my-nextjs-app",
   "resourceGroup": "my-nextjs-app-rg",
   "location": "eastus",

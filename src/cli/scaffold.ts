@@ -17,12 +17,11 @@ export interface ScaffoldOptions {
 
 /**
  * Scaffolds a new Next.js project with opinionated defaults:
- * - TypeScript, App Router, Tailwind v3, ESLint, src/ directory
+ * - TypeScript, App Router, Tailwind v4, ESLint, src/ directory
  */
 export async function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}): Promise<void> {
     console.log("Scaffolding new Next.js project...\n");
 
-    // Opinionated defaults (can be overridden)
     const {
         typescript = true,
         tailwind = true,
@@ -33,7 +32,6 @@ export async function scaffoldProject(targetDir: string, options: ScaffoldOption
         packageManager = "pnpm",
     } = options;
 
-    // Build create-next-app command with flags
     const flags = [
         typescript && "--typescript",
         appRouter && "--app",
@@ -47,119 +45,74 @@ export async function scaffoldProject(targetDir: string, options: ScaffoldOption
         .filter(Boolean)
         .join(" ");
 
-    // Use Next.js 15 (stable) for Tailwind v3 compatibility
     await execAsync(`npx create-next-app@15 ${targetDir} ${flags}`, { cwd: path.dirname(targetDir) });
 
     console.log("Next.js project created\n");
 
-    // Pin Tailwind to v3 and add prettier
-    console.log("Configuring dependencies...");
-
+    // Add minimal Azure dependencies
     const packageJsonPath = path.join(targetDir, "package.json");
     const packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf-8"));
 
-    // Remove Tailwind v4 packages and pin to v3
-    delete packageJson.devDependencies["@tailwindcss/postcss"];
+    packageJson.dependencies = {
+        ...packageJson.dependencies,
+        "opennext-azure": "latest",
+    };
 
     packageJson.devDependencies = {
         ...packageJson.devDependencies,
-        tailwindcss: "^3.4.0",
-        autoprefixer: "^10.4.0",
-        postcss: "^8.4.0",
-        prettier: "^3.2.0",
-        "prettier-plugin-tailwindcss": "^0.5.0",
+        esbuild: "^0.25.11",
     };
 
-    // Update scripts to use webpack (not turbopack)
-    packageJson.scripts = {
-        ...packageJson.scripts,
-        dev: "next dev",
-        build: "next build",
-    };
+    // Remove turbopack flags (not compatible with standalone builds)
+    if (packageJson.scripts.dev) {
+        packageJson.scripts.dev = packageJson.scripts.dev.replace(" --turbopack", "");
+    }
+    if (packageJson.scripts.build) {
+        packageJson.scripts.build = packageJson.scripts.build.replace(" --turbopack", "");
+    }
 
     await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2));
 
-    // Add prettier config (from opennextjs-azure repo)
-    const prettierConfig = {
-        tabWidth: 4,
-        printWidth: 120,
-        semi: true,
-        singleQuote: false,
-        trailingComma: "es5",
-        bracketSpacing: true,
-        arrowParens: "avoid",
-        plugins: ["prettier-plugin-tailwindcss"],
-    };
-
-    await fs.writeFile(path.join(targetDir, ".prettierrc"), JSON.stringify(prettierConfig, null, 2));
-
-    // Update next.config to use standalone output and disable Turbopack
+    // Add output: "standalone" to next.config.ts
     const nextConfigPath = path.join(targetDir, "next.config.ts");
-    const nextConfig = `import type { NextConfig } from "next";
+    let nextConfig = await fs.readFile(nextConfigPath, "utf-8");
 
-const nextConfig: NextConfig = {
-  output: "standalone",
-};
+    // Insert output: "standalone" into the config object
+    nextConfig = nextConfig.replace(
+        /const nextConfig: NextConfig = \{/,
+        `const nextConfig: NextConfig = {\n  output: "standalone",`
+    );
 
-export default nextConfig;
-`;
     await fs.writeFile(nextConfigPath, nextConfig);
 
-    // Update postcss.config for Tailwind v3
-    const postcssConfig = `export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-`;
-    await fs.writeFile(path.join(targetDir, "postcss.config.mjs"), postcssConfig);
-
-    // Update tailwind.config to have proper content paths
-    const tailwindConfig = `import type { Config } from "tailwindcss";
-
-const config: Config = {
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-};
-
-export default config;
-`;
-    await fs.writeFile(path.join(targetDir, "tailwind.config.ts"), tailwindConfig);
-
-    // Update globals.css with proper Tailwind v3 directives
-    const globalsCssPath = path.join(targetDir, srcDir ? "src/app/globals.css" : "app/globals.css");
-    if (tailwind) {
-        // Replace Tailwind v4 syntax with v3
-        const globalsCss = `@tailwind base;
-@tailwind components;
-@tailwind utilities;
-`;
-        await fs.writeFile(globalsCssPath, globalsCss);
-    } else {
-        // Remove all Tailwind directives if disabled
-        try {
-            let globalsCss = await fs.readFile(globalsCssPath, "utf-8");
-            globalsCss = globalsCss.replace(/@import\s+"tailwindcss";?/g, "").replace(/@tailwind[^;]*;/g, "");
-            await fs.writeFile(globalsCssPath, globalsCss.trim() || "/* Global styles */\n");
-        } catch {
-            // Ignore if file doesn't exist
-        }
-    }
-
-    console.log("Dependencies configured\n");
     console.log("Installing dependencies...");
 
-    // Delete lockfile and reinstall since we modified package.json
     await fs.unlink(path.join(targetDir, "pnpm-lock.yaml")).catch(() => {});
     await execAsync("pnpm install", { cwd: targetDir });
 
     console.log("Dependencies installed\n");
+
+    console.log("Creating open-next.config.ts...");
+    const openNextConfig = `// @ts-nocheck
+export default {
+    default: {
+        override: {
+            wrapper: () => import("${targetDir}/node_modules/opennext-azure/dist/adapters/wrappers/azure-functions.js").then(m => m.default),
+            converter: () => import("${targetDir}/node_modules/opennext-azure/dist/adapters/converters/azure-http.js").then(m => m.default),
+            incrementalCache: () => import("${targetDir}/node_modules/opennext-azure/dist/overrides/incrementalCache/azure-blob.js").then(m => new m.default()),
+            tagCache: () => import("${targetDir}/node_modules/opennext-azure/dist/overrides/tagCache/azure-table.js").then(m => new m.default()),
+            queue: () => import("${targetDir}/node_modules/opennext-azure/dist/overrides/queue/azure-queue.js").then(m => new m.default()),
+            proxyExternalRequest: "fetch",
+        },
+        routePreloadingBehavior: "none",
+    },
+    middleware: {
+        external: false,
+    },
+    buildOutputPath: ".",
+    appPath: ".",
+};
+`;
+    await fs.writeFile(path.join(targetDir, "open-next.config.ts"), openNextConfig);
+    console.log("Created open-next.config.ts\n");
 }

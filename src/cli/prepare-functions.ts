@@ -116,6 +116,11 @@ export async function prepareFunctions(): Promise<void> {
 
         await fs.writeFile(path.join(functionsDir, "package.json"), JSON.stringify(minimalPackageJson, null, 2));
 
+        // Remove any existing node_modules (pnpm creates symlinks that conflict with npm)
+        const nodeModulesPath = path.join(functionsDir, "node_modules");
+        await fs.rm(nodeModulesPath, { recursive: true, force: true });
+
+        // Always use npm for runtime dependencies (pnpm has issues with standalone builds)
         await execAsync("npm install --production --no-package-lock --loglevel=error", {
             cwd: functionsDir,
         });
