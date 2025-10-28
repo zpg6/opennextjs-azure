@@ -23,24 +23,12 @@ class AzureQueueRevalidation implements Queue {
         if (connectionString) {
             const queueServiceClient = QueueServiceClient.fromConnectionString(connectionString);
             this.queueClient = queueServiceClient.getQueueClient(queueName);
-            this.ensureQueueExists();
-        }
-    }
-
-    private async ensureQueueExists(): Promise<void> {
-        try {
-            await this.queueClient.create();
-        } catch (error: any) {
-            // 409 = queue already exists, which is fine
-            if (error.statusCode !== 409) {
-                console.error("Failed to create Azure Queue:", error);
-            }
         }
     }
 
     async send(message: QueueMessage): Promise<void> {
         if (!this.queueClient) {
-            console.warn("Azure Queue not configured. Skipping revalidation message.");
+            process.stderr.write("Azure Queue not configured. Skipping revalidation message.\n");
             return;
         }
 
@@ -58,7 +46,7 @@ class AzureQueueRevalidation implements Queue {
             // Azure Queue requires base64 encoding
             await this.queueClient.sendMessage(Buffer.from(messageContent).toString("base64"));
         } catch (error) {
-            console.error("Failed to send revalidation message:", error);
+            process.stderr.write(`Failed to send revalidation message: ${error}\n`);
             throw error;
         }
     }

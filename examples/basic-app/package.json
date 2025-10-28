@@ -6,7 +6,9 @@
         "dev": "next dev",
         "build": "next build",
         "start": "next start",
-        "lint": "eslint"
+        "lint": "eslint",
+        "azure:build": "npx opennext-azure@latest build",
+        "azure:deploy": "npx opennext-azure@latest build && npx opennext-azure@latest deploy"
     },
     "dependencies": {
         "react": "19.1.0",

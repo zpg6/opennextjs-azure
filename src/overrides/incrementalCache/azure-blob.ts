@@ -79,7 +79,7 @@ class AzureBlobIncrementalCache implements IncrementalCache {
             if (error.statusCode === 404) {
                 return null;
             }
-            console.error("Failed to get from Azure Blob cache:", error);
+            process.stderr.write(`Failed to get from Azure Blob cache: ${error}\n`);
             return null;
         }
     }
@@ -100,7 +100,7 @@ class AzureBlobIncrementalCache implements IncrementalCache {
                 },
             });
         } catch (error) {
-            console.error("Failed to set Azure Blob cache:", error);
+            process.stderr.write(`Failed to set Azure Blob cache: ${error}\n`);
             throw error;
         }
     }
@@ -111,7 +111,7 @@ class AzureBlobIncrementalCache implements IncrementalCache {
             const blobClient = this.containerClient.getBlobClient(blobKey);
             await blobClient.deleteIfExists();
         } catch (error) {
-            console.error("Failed to delete from Azure Blob cache:", error);
+            process.stderr.write(`Failed to delete from Azure Blob cache: ${error}\n`);
         }
     }
 }

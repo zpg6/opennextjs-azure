@@ -27,22 +27,9 @@ class AzureTableTagCache implements OriginalTagCache {
 
         if (connectionString) {
             this.tableClient = TableClient.fromConnectionString(connectionString, tableName);
-            this.ensureTableExists();
         } else if (accountName && accountKey) {
             const credential = new AzureNamedKeyCredential(accountName, accountKey);
             this.tableClient = new TableClient(`https://${accountName}.table.core.windows.net`, tableName, credential);
-            this.ensureTableExists();
-        }
-    }
-
-    private async ensureTableExists(): Promise<void> {
-        try {
-            await this.tableClient.createTable();
-        } catch (error: any) {
-            // 409 = table already exists, which is fine
-            if (error.statusCode !== 409) {
-                console.error("Failed to create Azure Table:", error);
-            }
         }
     }
 
@@ -69,7 +56,7 @@ class AzureTableTagCache implements OriginalTagCache {
 
             return paths;
         } catch (error) {
-            console.error("Failed to get by tag from Azure Table:", error);
+            process.stderr.write(`Failed to get by tag from Azure Table: ${error}\n`);
             return [];
         }
     }
@@ -92,7 +79,7 @@ class AzureTableTagCache implements OriginalTagCache {
 
             return tags;
         } catch (error) {
-            console.error("Failed to get by path from Azure Table:", error);
+            process.stderr.write(`Failed to get by path from Azure Table: ${error}\n`);
             return [];
         }
     }
@@ -115,7 +102,7 @@ class AzureTableTagCache implements OriginalTagCache {
 
             return lastModified ?? Date.now();
         } catch (error) {
-            console.error("Failed to get last modified from Azure Table:", error);
+            process.stderr.write(`Failed to get last modified from Azure Table: ${error}\n`);
             return lastModified ?? Date.now();
         }
     }
@@ -133,7 +120,7 @@ class AzureTableTagCache implements OriginalTagCache {
                 await this.tableClient.upsertEntity(entity, "Merge");
             }
         } catch (error) {
-            console.error("Failed to write tags to Azure Table:", error);
+            process.stderr.write(`Failed to write tags to Azure Table: ${error}\n`);
         }
     }
 }

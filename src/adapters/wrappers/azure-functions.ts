@@ -119,7 +119,6 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                 };
             }
         } catch (error) {
-            console.error("[OpenNextJS Azure] Handler error:", error);
             context.res = {
                 status: 500,
                 headers: { "content-type": "application/json" },

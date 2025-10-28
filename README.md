@@ -12,7 +12,7 @@ Built on the [OpenNext](https://opennext.js.org) framework, this adapter brings 
 
 ## The Gap This Project Fills
 
-Tutorials exist for static Next.js on Static Web Apps, standalone builds on App Service, and Docker-based deployments, but nothing for **true serverless Next.js** with ISR, streaming SSR, and on-demand revalidation—until now.
+Tutorials exist for static Next.js on Static Web Apps, standalone builds on App Service, and Docker-based deployments, but nothing for **true serverless Next.js** with ISR, streaming SSR, and on-demand revalidation on **⚡️ Azure Functions** —until now.
 
 Azure Functions is Microsoft's serverless compute platform—comparable to AWS Lambda and Cloudflare Workers, both of which already have OpenNext adapters. This project bridges that gap, bringing the same Vercel-grade developer experience to Azure: one command deploys your Next.js app with full ISR, streaming, and revalidation support—no manual infrastructure setup required.
 
