@@ -54,13 +54,21 @@ export default {
     }
 
     try {
-        // Step 1: Build with OpenNext (it expects a relative config file path)
+        // Step 1: Clean previous build output
+        const openNextPath = path.join(baseDir, ".open-next");
+        if (fs.existsSync(openNextPath)) {
+            console.log("Cleaning previous build output...");
+            fs.rmSync(openNextPath, { recursive: true, force: true });
+            console.log("Previous build cleaned\n");
+        }
+
+        // Step 2: Build with OpenNext (it expects a relative config file path)
         console.log("Running OpenNext build...");
         const externals = ["@opennextjs/aws"].join(",");
         await openNextBuild(resolvedConfigPath, externals);
         console.log("OpenNext build complete\n");
 
-        // Step 2: Add Azure Functions metadata
+        // Step 3: Add Azure Functions metadata
         await prepareFunctions();
 
         console.log("Build completed successfully!");
