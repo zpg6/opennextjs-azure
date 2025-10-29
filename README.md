@@ -24,6 +24,7 @@ Azure Functions is Microsoft's serverless compute platform—comparable to AWS L
 | Streaming SSR                          | Azure Functions with Node.js streams                                    |
 | `revalidateTag()` / `revalidatePath()` | Azure Table Storage + Queue Storage                                     |
 | Fetch caching                          | Blob containers with build ID namespacing                               |
+| Monitoring & Logging                   | Azure Application Insights (optional, enabled by default)               |
 | Infrastructure                         | Complete Bicep templates (Y1 Consumption for dev, EP1 Premium for prod) |
 
 ## Quick Start
@@ -113,6 +114,7 @@ Response Stream → Azure Functions Response
 - Storage Account (blob containers, tables, queues)
     - _Note: Table and Queue services are part of the Storage Account resource_
 - App Service Plan (Y1 Consumption or EP1 Premium)
+- Application Insights (optional, for monitoring and logging)
 - CORS configuration
 - Environment variables
 - Connection strings
@@ -189,6 +191,11 @@ opennextjs-azure deploy \
   [--location <region>] \
   [--environment dev|staging|prod] \
   [--skip-infrastructure]
+
+# View live logs in Azure Portal
+opennextjs-azure tail \
+  [--app-name <name>] \
+  [--resource-group <name>]
 ```
 
 ## License
