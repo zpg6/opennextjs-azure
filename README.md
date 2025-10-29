@@ -120,6 +120,8 @@ Response Stream → Azure Functions Response
 - Environment variables
 - Connection strings
 
+![Resource Group Screenshot](./docs/rg-screenshot.png)
+
 Choose your environment:
 
 - `--environment dev` → Y1 Consumption (pay-per-execution)
