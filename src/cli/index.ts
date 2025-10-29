@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { init } from "./init.js";
 import { build } from "./build.js";
 import { deploy } from "./deploy.js";
+import { tail } from "./tail.js";
 
 const program = new Command();
 
@@ -44,6 +45,15 @@ program
     .option("--skip-infrastructure", "Skip infrastructure provisioning")
     .action(async options => {
         await deploy(options);
+    });
+
+program
+    .command("tail")
+    .description("Open Azure Portal Log Stream in browser (live logs)")
+    .option("-n, --app-name <name>", "Application name")
+    .option("-g, --resource-group <name>", "Azure resource group name")
+    .action(async options => {
+        await tail(options);
     });
 
 program.parse();

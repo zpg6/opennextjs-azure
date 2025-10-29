@@ -67,6 +67,9 @@ npx opennext-azure build
 
 # Deploy (provisions infrastructure + deploys app)
 npx opennext-azure deploy
+
+# View live logs in Azure Portal
+npx opennext-azure tail
 ```
 
 ## Intelligent Preflight Checks
