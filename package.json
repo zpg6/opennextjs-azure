@@ -1,12 +1,12 @@
 {
-    "name": "opennext-azure",
-    "version": "0.3.3",
+    "name": "opennextjs-azure",
+    "version": "0.1.1",
     "description": "Azure adapter for Next.js applications using OpenNext",
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "bin": {
-        "opennextjs-azure": "./dist/cli/index.js"
+        "opennextjs-azure": "dist/cli/index.js"
     },
     "exports": {
         ".": {
@@ -64,7 +64,7 @@
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/zpg6/opennextjs-azure"
+        "url": "git+https://github.com/zpg6/opennextjs-azure.git"
     },
     "bugs": {
         "url": "https://github.com/zpg6/opennextjs-azure/issues"

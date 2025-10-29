@@ -7,7 +7,7 @@ A minimal Next.js 15 app deployed to Azure Functions, created entirely with the 
 ## How This Was Created
 
 ```bash
-npx opennext-azure@latest init --scaffold
+npx opennextjs-azure@latest init --scaffold
 npx opennextjs-azure build
 npx opennextjs-azure deploy
 ```
@@ -27,7 +27,7 @@ Create your own Next.js + Azure app:
 
 ```bash
 # In an empty directory
-npx opennext-azure@latest init --scaffold
+npx opennextjs-azure@latest init --scaffold
 
 # Edit azure.config.json with your app name and region
 

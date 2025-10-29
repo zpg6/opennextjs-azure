@@ -8,7 +8,7 @@
 
 Built on the [OpenNext](https://opennext.js.org) framework, this adapter brings native Next.js support to Azure Functions.
 
-> **🚀 New to Azure deployment?** Jump to [Quick Start](#quick-start) and run `npx opennext-azure@latest init --scaffold` to create a fully configured Next.js app on Azure in seconds!
+> **🚀 New to Azure deployment?** Jump to [Quick Start](#quick-start) and run `npx opennextjs-azure@latest init --scaffold` to create a fully configured Next.js app on Azure in seconds!
 
 ## The Gap This Project Fills
 
@@ -34,13 +34,13 @@ Azure Functions is Microsoft's serverless compute platform—comparable to AWS L
 **The fastest way to get started** is using our scaffold command, which wraps `create-next-app` and sets up everything for Azure deployment:
 
 ```bash
-npx opennext-azure@latest init --scaffold
+npx opennextjs-azure@latest init --scaffold
 ```
 
 This single command:
 
 1. Creates a new Next.js 15 app (TypeScript, App Router, Tailwind, ESLint)
-2. Adds Azure deployment dependencies (`opennext-azure`, `esbuild`)
+2. Adds Azure deployment dependencies (`opennextjs-azure`, `esbuild`)
 3. Configures `next.config.ts` with `output: "standalone"`
 4. Creates `open-next.config.ts` with Azure adapters
 5. Generates `infrastructure/main.bicep` for Azure resources
@@ -61,16 +61,16 @@ If you have an existing Next.js project:
 
 ```bash
 # Initialize Azure infrastructure
-npx opennext-azure init
+npx opennextjs-azure init
 
 # Build for Azure
-npx opennext-azure build
+npx opennextjs-azure build
 
 # Deploy (provisions infrastructure + deploys app)
-npx opennext-azure deploy
+npx opennextjs-azure deploy
 
 # View live logs in Azure Portal
-npx opennext-azure tail
+npx opennextjs-azure tail
 ```
 
 ## Intelligent Preflight Checks
@@ -145,7 +145,7 @@ Uses OpenNext's AWS build with Azure-specific overrides, then adds Azure Functio
 Creates a complete Next.js + Azure setup in one command:
 
 ```bash
-npx opennext-azure@latest init --scaffold
+npx opennextjs-azure@latest init --scaffold
 ```
 
 This wraps `create-next-app` with Azure-specific setup. Supports all create-next-app options:
