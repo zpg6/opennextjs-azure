@@ -9,4 +9,4 @@ build.config.ts
 .gitignore
 pnpm-lock.yaml
 node_modules/
-
+docs/

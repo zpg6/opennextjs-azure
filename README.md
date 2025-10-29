@@ -1,12 +1,14 @@
 # OpenNext.js Azure
 
-**True serverless Next.js on Azure Functions**
+**True serverless Next.js on Azure Functions** (EXPERIMENTAL)
 
 [![NPM Version](https://img.shields.io/npm/v/opennextjs-azure)](https://www.npmjs.com/package/opennextjs-azure)
 [![NPM Downloads](https://img.shields.io/npm/dt/opennextjs-azure)](https://www.npmjs.com/package/opennextjs-azure)
 [![License: MIT](https://img.shields.io/npm/l/opennextjs-azure)](https://opensource.org/licenses/MIT)
 
 Built on the [OpenNext](https://opennext.js.org) framework, this adapter brings native Next.js support to Azure Functions.
+
+![Deploy Screenshot](./docs/deploy-screenshot.png)
 
 > **🚀 New to Azure deployment?** Jump to [Quick Start](#quick-start) and run `npx opennextjs-azure@latest init --scaffold` to create a fully configured Next.js app on Azure in seconds!
 
