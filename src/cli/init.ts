@@ -100,7 +100,8 @@ function getAzureConfigTemplate(): string {
   "appName": "my-nextjs-app",
   "resourceGroup": "my-nextjs-app-rg",
   "location": "eastus",
-  "environment": "dev"
+  "environment": "dev",
+  "applicationInsights": true
 }
 `;
 }

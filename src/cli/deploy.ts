@@ -58,6 +58,7 @@ export async function deploy(options: {
         location: resourceGroupLocation || options.location || config.location || "eastus",
         environment,
         skipInfrastructure: options.skipInfrastructure,
+        applicationInsights: config.applicationInsights ?? false,
     });
 }
 

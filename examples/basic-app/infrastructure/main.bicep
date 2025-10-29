@@ -17,6 +17,9 @@ param environment string = 'dev'
 @allowed(['20', '22'])
 param nodeVersion string = '20'
 
+@description('Enable Application Insights for monitoring and logging')
+param enableApplicationInsights bool = false
+
 // Variables
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var sanitizedAppName = replace(toLower(appName), '-', '')
@@ -30,6 +33,21 @@ var appServicePlanName = '${appName}-plan-${environment}'
 var containerName = 'nextjs-cache'
 var tableName = 'nextjstags'
 var queueName = 'nextjsrevalidation'
+var applicationInsightsName = '${appName}-insights-${environment}'
+
+// Application Insights (optional)
+resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = if (enableApplicationInsights) {
+  name: applicationInsightsName
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    Request_Source: 'rest'
+    RetentionInDays: environment == 'prod' ? 90 : 30
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
+  }
+}
 
 // Storage Account (for cache, static assets, and function storage)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
@@ -122,7 +140,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
     serverFarmId: appServicePlan.id
     siteConfig: {
       linuxFxVersion: 'NODE|${nodeVersion}'
-      appSettings: [
+      appSettings: concat([
         {
           name: 'AzureWebJobsStorage'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
@@ -180,7 +198,17 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'NODE_ENV'
           value: 'production'
         }
-      ]
+      ], enableApplicationInsights ? [
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: applicationInsights.properties.ConnectionString
+        }
+        {
+          name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
+          value: '~3'
+        }
+      ] : [])
+      
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       cors: {
@@ -197,6 +225,8 @@ output functionAppUrl string = 'https://${functionApp.properties.defaultHostName
 output storageAccountName string = storageAccount.name
 output assetsUrl string = 'https://${storageAccount.name}.blob.${az.environment().suffixes.storage}/assets'
 output resourceGroupName string = resourceGroup().name
+output applicationInsightsName string = enableApplicationInsights ? applicationInsights.name : ''
+output applicationInsightsInstrumentationKey string = enableApplicationInsights ? applicationInsights.properties.InstrumentationKey : ''
 
 output deploymentInfo object = {
   functionApp: functionAppName
@@ -207,4 +237,5 @@ output deploymentInfo object = {
   assetsUrl: 'https://${storageAccount.name}.blob.${az.environment().suffixes.storage}/assets'
   functionUrl: 'https://${functionApp.properties.defaultHostName}'
   appUrl: 'https://${functionApp.properties.defaultHostName}'
+  applicationInsights: enableApplicationInsights ? applicationInsightsName : null
 }

@@ -18,6 +18,7 @@ interface DeployOptions {
     location?: string;
     environment?: "dev" | "staging" | "prod";
     skipInfrastructure?: boolean;
+    applicationInsights?: boolean;
 }
 
 export async function deploy(options: DeployOptions): Promise<void> {
@@ -62,6 +63,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
                 resourceGroup,
                 location,
                 environment,
+                applicationInsights: options.applicationInsights ?? false,
             });
             console.log(`${colors.green}✓${colors.reset} Infrastructure ready\n`);
         } else {
@@ -80,7 +82,13 @@ export async function deploy(options: DeployOptions): Promise<void> {
         console.log(`${colors.green}✓${colors.reset} Function App deployed\n`);
 
         // Step 4: Postflight checks and display detailed info
-        await performPostflightChecks(resourceGroup, functionAppName, location, environment);
+        await performPostflightChecks(
+            resourceGroup,
+            functionAppName,
+            location,
+            environment,
+            options.applicationInsights
+        );
     } catch (error: any) {
         console.error(`\n${colors.red}✗${colors.reset} Deployment failed: ${error.message}`);
         process.exit(1);
@@ -313,7 +321,8 @@ async function performPostflightChecks(
     resourceGroup: string,
     functionAppName: string,
     location: string,
-    environment: string
+    environment: string,
+    applicationInsights?: boolean
 ): Promise<void> {
     console.log("Performing post-deployment verification...\n");
 
@@ -359,6 +368,18 @@ async function performPostflightChecks(
         console.log(`  Storage Account:  ${storage.Name} (${storage.Sku})`);
         console.log(`  Capacity:         ${plan.Capacity || 1} instance(s)`);
 
+        if (applicationInsights) {
+            try {
+                const { stdout: insightsStdout } = await execAsync(
+                    `az monitor app-insights component show --app ${functionAppName.replace("-func-", "-insights-")} --resource-group ${resourceGroup} --query "{Name:name, InstrumentationKey:instrumentationKey}" -o json`
+                );
+                const insights = JSON.parse(insightsStdout);
+                console.log(`  App Insights:     ${insights.Name}`);
+            } catch {
+                // App Insights info optional
+            }
+        }
+
         console.log("\nQuick Actions:");
         console.log(
             `  View logs:        az functionapp log tail --name ${functionAppName} --resource-group ${resourceGroup}`
@@ -398,8 +419,9 @@ async function provisionInfrastructure(options: {
     resourceGroup: string;
     location: string;
     environment: string;
+    applicationInsights?: boolean;
 }): Promise<any> {
-    const { appName, resourceGroup, location, environment } = options;
+    const { appName, resourceGroup, location, environment, applicationInsights } = options;
 
     // Create resource group
     await execAsync(`az group create --name ${resourceGroup} --location ${location}`);
@@ -407,11 +429,12 @@ async function provisionInfrastructure(options: {
     // Deploy Bicep template from project root
     const bicepPath = path.join(process.cwd(), "infrastructure/main.bicep");
 
+    const enableAppInsights = applicationInsights ? "true" : "false";
     const { stdout } = await execAsync(
         `az deployment group create \
       --resource-group ${resourceGroup} \
       --template-file ${bicepPath} \
-      --parameters appName=${appName} environment=${environment} \
+      --parameters appName=${appName} environment=${environment} enableApplicationInsights=${enableAppInsights} \
       --query 'properties.outputs.deploymentInfo.value' \
       --output json`
     );

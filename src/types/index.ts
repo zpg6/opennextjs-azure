@@ -31,4 +31,5 @@ export interface AzureConfig {
     packageJsonPath?: string;
     deployment?: AzureDeploymentConfig;
     storage?: AzureStorageConfig;
+    applicationInsights?: boolean;
 }

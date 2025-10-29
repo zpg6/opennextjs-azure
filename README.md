@@ -108,6 +108,7 @@ Response Stream → Azure Functions Response
 
 - Function App (with streaming support)
 - Storage Account (blob containers, tables, queues)
+    - _Note: Table and Queue services are part of the Storage Account resource_
 - App Service Plan (Y1 Consumption or EP1 Premium)
 - CORS configuration
 - Environment variables
