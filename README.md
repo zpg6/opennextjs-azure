@@ -1,31 +1,31 @@
 # OpenNext.js Azure
 
+**True serverless Next.js on Azure Functions**
+
 [![NPM Version](https://img.shields.io/npm/v/opennextjs-azure)](https://www.npmjs.com/package/opennextjs-azure)
 [![NPM Downloads](https://img.shields.io/npm/dt/opennextjs-azure)](https://www.npmjs.com/package/opennextjs-azure)
 [![License: MIT](https://img.shields.io/npm/l/opennextjs-azure)](https://opensource.org/licenses/MIT)
 
-**True serverless Next.js on Azure Functions with ISR, streaming SSR, and on-demand revalidation.**
+Built on the [OpenNext](https://opennext.js.org) framework, this adapter brings native Next.js support to Azure Functions.
 
-Built on the [OpenNext](https://opennext.js.org) framework, this adapter brings native Next.js support to Azure Functions. No compromises—full ISR, streaming responses, and production-ready infrastructure.
-
-> **🚀 New to Azure deployment?** Jump to [Quick Start](#quick-start) and run `npx opennext-azure@latest init --scaffold` to create a fully configured Next.js app ready for Azure in seconds!
+> **🚀 New to Azure deployment?** Jump to [Quick Start](#quick-start) and run `npx opennext-azure@latest init --scaffold` to create a fully configured Next.js app on Azure in seconds!
 
 ## The Gap This Project Fills
 
-Tutorials exist for static Next.js on Static Web Apps, standalone builds on App Service, and Docker-based deployments, but nothing for **true serverless Next.js** with ISR, streaming SSR, and on-demand revalidation on **⚡️ Azure Functions** —until now.
+Tutorials exist for static Next.js on Static Web Apps, standalone builds on App Service, and Docker-based deployments, but nothing for **true serverless Next.js on Azure Functions** with ISR, streaming SSR, and on-demand revalidation—until now.
 
-Azure Functions is Microsoft's serverless compute platform—comparable to AWS Lambda and Cloudflare Workers, both of which already have OpenNext adapters. This project bridges that gap, bringing the same Vercel-grade developer experience to Azure: one command deploys your Next.js app with full ISR, streaming, and revalidation support—no manual infrastructure setup required.
+Azure Functions is Microsoft's serverless compute platform—comparable to AWS Lambda and Cloudflare Workers, both of which already have OpenNext adapters. This project bridges that gap, bringing the same Vercel-grade developer experience to Azure: one command deploys your Next.js app with all the infrastructure you need.
 
 ## Next.js Features → Azure Services
 
-| Next.js Feature                        | Azure Implementation                                                    |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| Incremental Static Regeneration        | Azure Blob Storage                                                      |
-| Streaming SSR                          | Azure Functions with Node.js streams                                    |
-| `revalidateTag()` / `revalidatePath()` | Azure Table Storage + Queue Storage                                     |
-| Fetch caching                          | Blob containers with build ID namespacing                               |
-| Monitoring & Logging                   | Azure Application Insights (optional, enabled by default)               |
-| Infrastructure                         | Complete Bicep templates (Y1 Consumption for dev, EP1 Premium for prod) |
+| Next.js Feature                        | Azure Implementation                                            |
+| -------------------------------------- | --------------------------------------------------------------- |
+| Incremental Static Regeneration        | Azure Blob Storage                                              |
+| Streaming SSR                          | Azure Functions with Node.js streams                            |
+| `revalidateTag()` / `revalidatePath()` | Azure Table Storage + Queue Storage                             |
+| Fetch caching                          | Azure Blob Storage with build ID namespacing                    |
+| Monitoring & Logging                   | Azure Application Insights (optional, enabled by default)       |
+| Infrastructure                         | Azure Bicep templates upsert infrastructure in a resource group |
 
 ## Quick Start
 
@@ -80,7 +80,7 @@ Before deployment, the CLI validates your Azure environment to prevent failed de
 ✓ **Azure CLI** installation and login status  
 ✓ **Subscription** permissions and state  
 ✓ **Region** availability  
-✓ **Resource providers** (auto-registers Microsoft.Web, Microsoft.Storage)  
+✓ **Resource providers** (auto-registers Microsoft.Quota, Microsoft.Storage, Microsoft.AlertsManagement, etc.)  
 ✓ **Quota availability** for your target SKU  
 ✓ **Build output** structure
 
@@ -112,7 +112,6 @@ Response Stream → Azure Functions Response
 
 - Function App (with streaming support)
 - Storage Account (blob containers, tables, queues)
-    - _Note: Table and Queue services are part of the Storage Account resource_
 - App Service Plan (Y1 Consumption or EP1 Premium)
 - Application Insights (optional, for monitoring and logging)
 - CORS configuration
@@ -138,18 +137,6 @@ Converts between Azure Functions HTTP triggers and Next.js InternalEvent/Interna
 
 **Build Process:**  
 Uses OpenNext's AWS build with Azure-specific overrides, then adds Azure Functions metadata (`host.json`, `function.json`) for v3 programming model.
-
-## Examples
-
-Check out [`examples/basic-app`](./examples/basic-app) - a complete working Next.js 15 app deployed to Azure. This example was created with `npx opennext-azure@latest init --scaffold` and demonstrates:
-
-- ✅ Next.js 15 with App Router, TypeScript, Tailwind v4
-- ✅ ISR caching with Azure Blob Storage
-- ✅ Tag-based revalidation with Azure Table Storage
-- ✅ Streaming SSR on Azure Functions
-- ✅ Production deployment on Consumption Plan (Y1)
-
-**Live demo:** https://opennext-basic-app-func-dev.azurewebsites.net
 
 ## CLI Commands
 
