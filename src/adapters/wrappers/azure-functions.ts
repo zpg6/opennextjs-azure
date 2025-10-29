@@ -119,13 +119,19 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                 };
             }
         } catch (error) {
+            const isProduction = process.env.NODE_ENV === "production";
+
             context.res = {
                 status: 500,
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
                     error: "Internal Server Error",
-                    message: error instanceof Error ? error.message : String(error),
-                    stack: error instanceof Error ? error.stack : undefined,
+                    ...(isProduction
+                        ? {}
+                        : {
+                              message: error instanceof Error ? error.message : String(error),
+                              stack: error instanceof Error ? error.stack : undefined,
+                          }),
                 }),
             };
         }
