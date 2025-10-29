@@ -38,7 +38,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
         await checkAzureLogin();
         await checkAzureSubscriptionPermissions();
         await checkLocation(location);
-        await checkRequiredProviders();
+        await checkRequiredProviders(options.applicationInsights);
         await checkQuotaAvailability(location, environment);
         await checkBuildOutput();
 
@@ -112,8 +112,12 @@ async function checkAzureLogin(): Promise<void> {
     }
 }
 
-async function checkRequiredProviders(): Promise<void> {
+async function checkRequiredProviders(applicationInsights?: boolean): Promise<void> {
     const requiredProviders = ["Microsoft.Web", "Microsoft.Storage", "Microsoft.Compute", "Microsoft.Quota"];
+
+    if (applicationInsights) {
+        requiredProviders.push("Microsoft.AlertsManagement");
+    }
 
     console.log("Checking Azure resource providers...");
 
