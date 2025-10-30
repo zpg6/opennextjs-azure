@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Health check command for validating deployment status.
+- Delete command for removing resource groups with confirmation prompt.
 
 ### Fixed
 
