@@ -187,6 +187,11 @@ opennextjs-azure deploy \
 opennextjs-azure tail \
   [--app-name <name>] \
   [--resource-group <name>]
+
+# Check deployment health
+opennextjs-azure health \
+  [--app-name <name>] \
+  [--resource-group <name>]
 ```
 
 ## License
