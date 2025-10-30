@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Health check command for validating deployment status.
+
 ### Fixed
 
 - Only return error message and stack trace in HTTP response in development mode.
