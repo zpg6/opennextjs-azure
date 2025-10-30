@@ -4,6 +4,7 @@ import { init } from "./init.js";
 import { build } from "./build.js";
 import { deploy } from "./deploy.js";
 import { tail } from "./tail.js";
+import { health } from "./health.js";
 
 const program = new Command();
 
@@ -54,6 +55,15 @@ program
     .option("-g, --resource-group <name>", "Azure resource group name")
     .action(async options => {
         await tail(options);
+    });
+
+program
+    .command("health")
+    .description("Check health status of Azure deployment resources")
+    .option("-n, --app-name <name>", "Application name")
+    .option("-g, --resource-group <name>", "Azure resource group name")
+    .action(async options => {
+        await health(options);
     });
 
 program.parse();
