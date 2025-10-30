@@ -2,6 +2,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { greenCheck, redX } from "../cli/log.js";
 
 const execAsync = promisify(exec);
 
@@ -65,7 +66,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
                 environment,
                 applicationInsights: options.applicationInsights ?? false,
             });
-            console.log(`${colors.green}✓${colors.reset} Infrastructure ready\n`);
+            console.log(`  ${greenCheck()} Infrastructure ready\n`);
         } else {
             console.log("Skipping infrastructure provisioning\n");
         }
@@ -73,13 +74,13 @@ export async function deploy(options: DeployOptions): Promise<void> {
         // Step 2: Upload static assets to Blob Storage
         console.log("Uploading static assets...");
         await uploadStaticAssets(appName, resourceGroup);
-        console.log(`${colors.green}✓${colors.reset} Assets uploaded\n`);
+        console.log(`  ${greenCheck()} Assets uploaded\n`);
 
         // Step 3: Deploy Function App
         console.log("Deploying Function App...");
         const functionAppName = deploymentOutputs?.functionApp || `${appName}-func-${environment}`;
         await deployFunctionApp(functionAppName, resourceGroup);
-        console.log(`${colors.green}✓${colors.reset} Function App deployed\n`);
+        console.log(`  ${greenCheck()} Function App deployed\n`);
 
         // Step 4: Postflight checks and display detailed info
         await performPostflightChecks(
@@ -90,7 +91,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
             options.applicationInsights
         );
     } catch (error: any) {
-        console.error(`\n${colors.red}✗${colors.reset} Deployment failed: ${error.message}`);
+        console.error(`\n${redX()} Deployment failed: ${error.message}`);
         process.exit(1);
     }
 }
@@ -119,7 +120,7 @@ async function checkRequiredProviders(applicationInsights?: boolean): Promise<vo
         requiredProviders.push("Microsoft.AlertsManagement");
     }
 
-    console.log("Checking Azure resource providers...");
+    console.log("Checking Azure resource providers...\n");
 
     for (const provider of requiredProviders) {
         const { stdout } = await execAsync(
@@ -128,9 +129,9 @@ async function checkRequiredProviders(applicationInsights?: boolean): Promise<vo
         const state = stdout.trim();
 
         if (state !== "Registered") {
-            console.log(`  Registering ${provider}...`);
+            console.log(`Registering ${provider}...`);
             await execAsync(`az provider register --namespace ${provider} --wait`);
-            console.log(`  ${colors.green}✓${colors.reset} ${provider} registered`);
+            console.log(`  ${greenCheck()} ${provider} registered\n`);
         }
     }
 }
@@ -164,9 +165,7 @@ async function checkQuotaAvailability(location: string, environment: string): Pr
         const requiredSku = skuMap[environment];
 
         if (requiredSku.quota === 0) {
-            console.error(
-                `\n${colors.red}✗${colors.reset} Quota Error: No quota available for ${environment} environment`
-            );
+            console.error(`\n${redX()} Quota Error: No quota available for ${environment} environment`);
             console.error(`  Required: ${requiredSku.name}`);
             console.error(`  Current Limit: ${requiredSku.quota}\n`);
 
@@ -190,14 +189,14 @@ async function checkQuotaAvailability(location: string, environment: string): Pr
             throw new Error(`No ${requiredSku.type} quota available for ${environment} environment in ${location}`);
         }
 
-        console.log(`  ${colors.green}✓${colors.reset} ${requiredSku.name}: ${requiredSku.quota} instances available`);
+        console.log(`  ${greenCheck()} ${requiredSku.name}: ${requiredSku.quota} instances available\n`);
 
         if (environment === "dev" && ep1Limit > 0) {
             console.log(
-                `  Premium tier also available (${ep1Limit} instances) - use --environment prod for better performance`
+                `  Premium tier also available (${ep1Limit} instances) - use --environment prod for better performance\n`
             );
         } else if (environment !== "dev" && y1Limit > 0) {
-            console.log(`  Consumption tier available (${y1Limit} instances) - use --environment dev for lower cost`);
+            console.log(`  Consumption tier available (${y1Limit} instances) - use --environment dev for lower cost\n`);
         }
     } catch (error: any) {
         if (error.message?.includes("No") && error.message?.includes("quota available")) {
@@ -220,7 +219,7 @@ async function checkAzureSubscriptionPermissions(): Promise<void> {
             throw new Error(`Subscription "${account.Name}" is not enabled (state: ${account.State})`);
         }
 
-        console.log(`  ${colors.green}✓${colors.reset} Subscription: ${account.Name} (${account.State})`);
+        console.log(`  ${greenCheck()} Subscription: ${account.Name} (${account.State})\n`);
     } catch (error: any) {
         throw new Error(`Failed to verify subscription permissions: ${error.message}`);
     }
@@ -244,13 +243,13 @@ async function checkLocation(location: string): Promise<void> {
             );
         }
 
-        console.log(`  ${colors.green}✓${colors.reset} Region: ${locations[0].DisplayName} (${location})`);
+        console.log(`  ${greenCheck()} Region: ${locations[0].DisplayName} (${location})\n`);
     } catch (error: any) {
         if (error.message.includes("Invalid location")) {
             throw error;
         }
         console.warn(
-            `  ${colors.yellow}Warning:${colors.reset} Could not validate location (continuing anyway): ${error.message}`
+            `  ${colors.yellow}Warning:${colors.reset} Could not validate location (continuing anyway): ${error.message}\n`
         );
     }
 }
@@ -278,7 +277,7 @@ async function checkBuildOutput(): Promise<void> {
         }
     }
 
-    console.log(`  ${colors.green}✓${colors.reset} Build output structure valid`);
+    console.log(`  ${greenCheck()} Build output structure valid\n`);
 }
 
 async function checkExistingInfrastructure(appName: string, resourceGroup: string, environment: string): Promise<void> {
@@ -318,7 +317,7 @@ async function checkExistingInfrastructure(appName: string, resourceGroup: strin
         );
     }
 
-    console.log(`  ${colors.green}✓${colors.reset} All required infrastructure exists`);
+    console.log(`  ${greenCheck()} All required infrastructure exists`);
 }
 
 async function performPostflightChecks(
@@ -328,7 +327,7 @@ async function performPostflightChecks(
     environment: string,
     applicationInsights?: boolean
 ): Promise<void> {
-    console.log("Performing post-deployment verification...\n");
+    console.log("Performing post-deployment verification...");
 
     try {
         const { stdout: subIdStdout } = await execAsync("az account show --query id -o tsv");
@@ -353,8 +352,8 @@ async function performPostflightChecks(
         const assetsUrl = `https://${storage.Name}.blob.core.windows.net/assets`;
         const portalUrl = `https://portal.azure.com/#@/resource/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}`;
 
-        console.log("═══════════════════════════════════════════════");
-        console.log(`${colors.green}✓${colors.reset} Deployment Complete!`);
+        console.log("\n═══════════════════════════════════════════════");
+        console.log(`${greenCheck()} Deployment Complete!`);
         console.log("═══════════════════════════════════════════════");
         console.log("\nApplication:");
         console.log(`  App URL:          ${functionUrl}`);
@@ -401,7 +400,7 @@ async function performPostflightChecks(
         console.warn(
             `${colors.yellow}Warning:${colors.reset} Could not retrieve all deployment details: ${error.message}`
         );
-        console.log(`\n${colors.green}✓${colors.reset} Deployment completed, but some post-flight checks failed.`);
+        console.log(`\n${greenCheck()} Deployment completed, but some post-flight checks failed.`);
         console.log(`  View resources: az resource list --resource-group ${resourceGroup} -o table\n`);
     }
 }

@@ -2,6 +2,7 @@ import { build as openNextBuild } from "@opennextjs/aws/build.js";
 import path from "node:path";
 import fs from "node:fs";
 import { prepareFunctions } from "./prepare-functions.js";
+import { greenCheck } from "./log.js";
 
 export async function build(configPath?: string): Promise<void> {
     console.log("Building Next.js app for Azure...\n");
@@ -59,14 +60,14 @@ export default {
         if (fs.existsSync(openNextPath)) {
             console.log("Cleaning previous build output...");
             fs.rmSync(openNextPath, { recursive: true, force: true });
-            console.log("Previous build cleaned\n");
+            console.log(`  ${greenCheck()} Previous build cleaned\n`);
         }
 
         // Step 2: Build with OpenNext (it expects a relative config file path)
         console.log("Running OpenNext build...");
         const externals = ["@opennextjs/aws"].join(",");
         await openNextBuild(resolvedConfigPath, externals);
-        console.log("OpenNext build complete\n");
+        console.log(`  ${greenCheck()} OpenNext build complete\n`);
 
         // Step 3: Add Azure Functions metadata
         await prepareFunctions();

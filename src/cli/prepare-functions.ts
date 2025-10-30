@@ -2,6 +2,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { greenCheck } from "./log.js";
 
 const execAsync = promisify(exec);
 
@@ -97,9 +98,9 @@ export async function prepareFunctions(): Promise<void> {
 
     await fs.writeFile(path.join(functionDir, "function.json"), JSON.stringify(functionJson, null, 2));
 
-    console.log("Azure Functions metadata created");
+    console.log(`  ${greenCheck()} Azure Functions metadata created\n`);
 
-    console.log("\nInstalling minimal runtime dependencies...");
+    console.log("Installing minimal runtime dependencies...");
     try {
         const originalPackageJson = JSON.parse(await fs.readFile(path.join(functionsDir, "package.json"), "utf-8"));
 
@@ -124,7 +125,7 @@ export async function prepareFunctions(): Promise<void> {
         await execAsync("npm install --production --no-package-lock --loglevel=error", {
             cwd: functionsDir,
         });
-        console.log("Runtime dependencies installed\n");
+        console.log(`  ${greenCheck()} Runtime dependencies installed\n`);
     } catch (error: any) {
         console.error("Failed to install dependencies:", error.message);
         throw error;

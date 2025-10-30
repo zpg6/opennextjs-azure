@@ -2,6 +2,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { greenCheck, redX } from "./log.js";
 
 const execAsync = promisify(exec);
 
@@ -40,7 +41,7 @@ export async function health(options?: { appName?: string; resourceGroup?: strin
     const environment = config.environment || "dev";
 
     if (!appName || !resourceGroup) {
-        console.error(`${colors.red}✗${colors.reset} Missing required information!`);
+        console.error(`${redX()} Missing required information!`);
         console.error("  Provide --app-name and --resource-group or run from a project with azure.config.json\n");
         process.exit(1);
     }
@@ -72,13 +73,13 @@ export async function health(options?: { appName?: string; resourceGroup?: strin
         try {
             const result = await check.fn();
             if (result.passed) {
-                console.log(`${colors.green}✓${colors.reset} ${check.name}`);
+                console.log(`${greenCheck()} ${check.name}`);
                 if (result.details) {
                     console.log(`  ${result.details}`);
                 }
                 passedCount++;
             } else {
-                console.log(`${colors.red}✗${colors.reset} ${check.name}`);
+                console.log(`${redX()} ${check.name}`);
                 console.log(`  ${result.message}`);
                 if (result.details) {
                     console.log(`  ${result.details}`);
@@ -87,7 +88,7 @@ export async function health(options?: { appName?: string; resourceGroup?: strin
                 errors.push(`${check.name}: ${result.message}`);
             }
         } catch (error: any) {
-            console.log(`${colors.red}✗${colors.reset} ${check.name}`);
+            console.log(`${redX()} ${check.name}`);
             console.log(`  ${error.message}`);
             failedCount++;
             errors.push(`${check.name}: ${error.message}`);
