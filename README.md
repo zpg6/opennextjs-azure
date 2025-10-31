@@ -192,6 +192,12 @@ opennextjs-azure tail \
 opennextjs-azure health \
   [--app-name <name>] \
   [--resource-group <name>]
+
+# Delete resource group and all resources
+opennextjs-azure delete \
+  [--resource-group <name>] \
+  [--yes] \
+  [--no-wait]
 ```
 
 ## License

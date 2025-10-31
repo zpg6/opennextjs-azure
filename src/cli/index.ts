@@ -5,6 +5,7 @@ import { build } from "./build.js";
 import { deploy } from "./deploy.js";
 import { tail } from "./tail.js";
 import { health } from "./health.js";
+import { deleteResourceGroup } from "./delete.js";
 
 const program = new Command();
 
@@ -64,6 +65,16 @@ program
     .option("-g, --resource-group <name>", "Azure resource group name")
     .action(async options => {
         await health(options);
+    });
+
+program
+    .command("delete")
+    .description("Delete Azure resource group and all its resources")
+    .option("-g, --resource-group <name>", "Azure resource group name")
+    .option("-y, --yes", "Skip confirmation prompt")
+    .option("--no-wait", "Delete in background (returns immediately)")
+    .action(async options => {
+        await deleteResourceGroup(options);
     });
 
 program.parse();
