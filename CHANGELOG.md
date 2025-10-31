@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Health check now validates static asset cache headers are configured correctly.
+- Health check now performs HTTP request to verify Function App is responding (with response time).
+
 ### Fixed
 
-- Static assets now have proper cache-control headers (\_next/static files are immutable with 1-year cache, other assets always revalidate).
+- Static assets on Azure Blob Storage now have proper cache-control headers (\_next/static files have `immutable` with 1-year cache, other assets have `must-revalidate`).
+- Static asset redirects now conditionally set cache headers based on file path (only \_next/static files get immutable cache).
+- `_next/data` files are no longer redirected to blob storage, allowing proper ISR cache handling through the function app.
 
 ## [0.1.2] - 2025-10-30
 
