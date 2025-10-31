@@ -8,7 +8,6 @@ const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
 // Static asset patterns that should be served from blob storage
 const STATIC_ASSET_PATTERNS = [
     /^\/_next\/static\//,
-    /^\/_next\/data\//,
     /^\/favicon\.ico$/,
     /^\/robots\.txt$/,
     /^\/sitemap\.xml$/,
@@ -35,11 +34,16 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
             // (Front Door URL rewrite doesn't work reliably with blob containers)
             if (isStaticAssetRequest(internalEvent.rawPath)) {
                 const blobUrl = `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/assets${internalEvent.rawPath}`;
+
+                const cacheControl = internalEvent.rawPath.startsWith("/_next/static/")
+                    ? "public, max-age=31536000, immutable"
+                    : "public, max-age=0, must-revalidate";
+
                 context.res = {
                     status: 301,
                     headers: {
                         Location: blobUrl,
-                        "Cache-Control": "public, max-age=31536000, immutable",
+                        "Cache-Control": cacheControl,
                     },
                 };
                 return;

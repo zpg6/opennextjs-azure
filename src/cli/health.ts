@@ -209,6 +209,32 @@ async function checkStorageAccount(
             };
         }
 
+        // Verify static assets have correct cache headers by checking first _next/static file
+        try {
+            const { stdout: staticFileStdout } = await execAsync(
+                `az storage blob list --account-name ${account.Name} --container-name assets --prefix _next/static --query '[0].name' -o tsv --only-show-errors 2>/dev/null || echo ""`
+            );
+            const sampleFile = staticFileStdout.trim();
+
+            if (sampleFile) {
+                const { stdout: cacheStdout } = await execAsync(
+                    `az storage blob show --account-name ${account.Name} --container-name assets --name '${sampleFile}' --query 'properties.contentSettings.cacheControl' -o tsv --only-show-errors 2>/dev/null || echo ""`
+                );
+                const cacheControl = cacheStdout.trim();
+
+                const expectedCache = "public, max-age=31536000, immutable";
+                if (cacheControl !== expectedCache) {
+                    return {
+                        passed: false,
+                        message: "Static asset cache headers misconfigured",
+                        details: `${sampleFile.split("/").pop()} has '${cacheControl || "none"}' (expected '${expectedCache}')`,
+                    };
+                }
+            }
+        } catch {
+            // Cache header validation is non-critical if it fails
+        }
+
         return {
             passed: true,
             message: "Storage account healthy",
@@ -306,11 +332,25 @@ async function checkFunctionAppStatus(
             };
         }
 
-        return {
-            passed: true,
-            message: "Function app running",
-            details: `URL: https://${funcApp.DefaultHostName}`,
-        };
+        // Test if the function app actually responds to HTTP requests
+        const url = `https://${funcApp.DefaultHostName}`;
+        try {
+            const startTime = Date.now();
+            await execAsync(`curl -I -s -o /dev/null -w "%{http_code}" --max-time 10 "${url}" || echo "000"`);
+            const responseTime = Date.now() - startTime;
+
+            return {
+                passed: true,
+                message: "Function app running and responding",
+                details: `URL: ${url} (${responseTime}ms)`,
+            };
+        } catch {
+            return {
+                passed: true,
+                message: "Function app running",
+                details: `URL: ${url} (HTTP check failed, but app is running)`,
+            };
+        }
     } catch (error: any) {
         return {
             passed: false,

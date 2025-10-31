@@ -1,6 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { greenCheck, redX } from "../cli/log.js";
 
@@ -445,8 +446,33 @@ async function provisionInfrastructure(options: {
     return JSON.parse(stdout);
 }
 
+async function patchCSSForBlobStorage(assetsPath: string): Promise<void> {
+    const cssPath = path.join(assetsPath, "_next/static/css");
+
+    if (!existsSync(cssPath)) {
+        return;
+    }
+
+    const files = await fs.readdir(cssPath);
+    const cssFiles = files.filter(f => f.endsWith(".css"));
+
+    for (const file of cssFiles) {
+        const filePath = path.join(cssPath, file);
+        let content = await fs.readFile(filePath, "utf-8");
+
+        // Fix absolute URLs in CSS to include /assets container path
+        // url(/_next/static/media/...) -> url(/assets/_next/static/media/...)
+        content = content.replace(/url\(\s*(['"]?)(\/_next\/static\/media\/[^'")\s]+)\1\s*\)/g, "url($1/assets$2$1)");
+
+        await fs.writeFile(filePath, content, "utf-8");
+    }
+}
+
 async function uploadStaticAssets(appName: string, resourceGroup: string): Promise<void> {
     const assetsPath = path.join(process.cwd(), ".open-next/assets");
+
+    // Patch CSS files to include /assets path for blob storage URLs
+    await patchCSSForBlobStorage(assetsPath);
 
     // Get storage account name
     const { stdout } = await execAsync(
@@ -454,14 +480,29 @@ async function uploadStaticAssets(appName: string, resourceGroup: string): Promi
     );
     const storageAccountName = stdout.trim();
 
-    // Upload to blob storage
+    // Upload all assets with default short-term caching first
     await execAsync(
         `az storage blob upload-batch \
       --account-name ${storageAccountName} \
       --destination assets \
       --source ${assetsPath} \
+      --content-cache-control "public, max-age=0, must-revalidate" \
       --overwrite`
     );
+
+    // Override _next/static assets with long-term caching (immutable, content-hashed files)
+    const nextStaticPath = path.join(assetsPath, "_next/static");
+    if (existsSync(nextStaticPath)) {
+        await execAsync(
+            `az storage blob upload-batch \
+        --account-name ${storageAccountName} \
+        --destination assets \
+        --source ${nextStaticPath} \
+        --destination-path _next/static \
+        --content-cache-control "public, max-age=31536000, immutable" \
+        --overwrite`
+        );
+    }
 }
 
 async function deployFunctionApp(functionAppName: string, resourceGroup: string): Promise<void> {
