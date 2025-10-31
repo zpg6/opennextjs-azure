@@ -49,4 +49,4 @@ jobs:
 
             - name: Build Example (Basic App)
               working-directory: examples/basic-app
-              run: node ../../dist/cli/index.js build
+              run: pnpm opennextjs-azure build
