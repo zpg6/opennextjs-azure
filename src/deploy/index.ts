@@ -446,8 +446,33 @@ async function provisionInfrastructure(options: {
     return JSON.parse(stdout);
 }
 
+async function patchCSSForBlobStorage(assetsPath: string): Promise<void> {
+    const cssPath = path.join(assetsPath, "_next/static/css");
+
+    if (!existsSync(cssPath)) {
+        return;
+    }
+
+    const files = await fs.readdir(cssPath);
+    const cssFiles = files.filter(f => f.endsWith(".css"));
+
+    for (const file of cssFiles) {
+        const filePath = path.join(cssPath, file);
+        let content = await fs.readFile(filePath, "utf-8");
+
+        // Fix absolute URLs in CSS to include /assets container path
+        // url(/_next/static/media/...) -> url(/assets/_next/static/media/...)
+        content = content.replace(/url\(\s*(['"]?)(\/_next\/static\/media\/[^'")\s]+)\1\s*\)/g, "url($1/assets$2$1)");
+
+        await fs.writeFile(filePath, content, "utf-8");
+    }
+}
+
 async function uploadStaticAssets(appName: string, resourceGroup: string): Promise<void> {
     const assetsPath = path.join(process.cwd(), ".open-next/assets");
+
+    // Patch CSS files to include /assets path for blob storage URLs
+    await patchCSSForBlobStorage(assetsPath);
 
     // Get storage account name
     const { stdout } = await execAsync(
