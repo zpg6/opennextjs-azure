@@ -67,7 +67,6 @@ export default {
         console.log("Running OpenNext build...");
         const externals = ["@opennextjs/aws"].join(",");
         await openNextBuild(resolvedConfigPath, externals);
-        console.log(`  ${greenCheck()} OpenNext build complete\n`);
 
         // Step 3: Add Azure Functions metadata
         await prepareFunctions();
