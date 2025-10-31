@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Static asset redirects now conditionally set cache headers based on file path (only \_next/static files get immutable cache).
 - `_next/data` files are no longer redirected to blob storage, allowing proper ISR cache handling through the function app.
 - CSS files are now patched during deployment to include `/assets` container path in font URLs, fixing 400 errors for fonts referenced in stylesheets.
+- View logs quick action now recommends using `npx opennextjs-azure@latest tail` to access live logs in the Azure Portal.
 
 ## [0.1.2] - 2025-10-30
 

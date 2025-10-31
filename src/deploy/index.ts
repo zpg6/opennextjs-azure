@@ -385,9 +385,7 @@ async function performPostflightChecks(
         }
 
         console.log("\nQuick Actions:");
-        console.log(
-            `  View logs:        az functionapp log tail --name ${functionAppName} --resource-group ${resourceGroup}`
-        );
+        console.log(`  View logs:        npx opennextjs-azure@latest tail`);
         console.log(`  Open in portal:   ${portalUrl}`);
         console.log("═══════════════════════════════════════════════\n");
 
