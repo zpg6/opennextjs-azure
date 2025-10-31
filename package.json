@@ -1,7 +1,7 @@
 {
     "name": "opennextjs-azure",
     "version": "0.1.2",
-    "description": "Azure adapter for Next.js applications using OpenNext",
+    "description": "True serverless Next.js on Azure Functions with a Vercel-grade developer experience",
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -69,7 +69,6 @@
     "bugs": {
         "url": "https://github.com/zpg6/opennextjs-azure/issues"
     },
-    "homepage": "https://opennext.js.org/azure",
     "dependencies": {
         "@opennextjs/aws": "^3.8.5",
         "@azure/functions": "^4.5.1",

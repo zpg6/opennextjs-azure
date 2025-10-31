@@ -6,7 +6,7 @@
 [![NPM Downloads](https://img.shields.io/npm/dt/opennextjs-azure)](https://www.npmjs.com/package/opennextjs-azure)
 [![License: MIT](https://img.shields.io/npm/l/opennextjs-azure)](https://opensource.org/licenses/MIT)
 
-Built on the [OpenNext](https://opennext.js.org) framework, this adapter brings native Next.js support to Azure Functions.
+Built on the [OpenNext](https://opennext.js.org) framework, this adapter brings native Next.js support to Azure Functions with a Vercel-grade developer experience.
 
 ![Deploy Screenshot](./docs/deploy-screenshot.png)
 
