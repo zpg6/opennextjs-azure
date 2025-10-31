@@ -1,6 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { greenCheck, redX } from "../cli/log.js";
 
@@ -454,14 +455,29 @@ async function uploadStaticAssets(appName: string, resourceGroup: string): Promi
     );
     const storageAccountName = stdout.trim();
 
-    // Upload to blob storage
+    // Upload all assets with default short-term caching first
     await execAsync(
         `az storage blob upload-batch \
       --account-name ${storageAccountName} \
       --destination assets \
       --source ${assetsPath} \
+      --content-cache-control "public, max-age=0, must-revalidate" \
       --overwrite`
     );
+
+    // Override _next/static assets with long-term caching (immutable, content-hashed files)
+    const nextStaticPath = path.join(assetsPath, "_next/static");
+    if (existsSync(nextStaticPath)) {
+        await execAsync(
+            `az storage blob upload-batch \
+        --account-name ${storageAccountName} \
+        --destination assets \
+        --source ${nextStaticPath} \
+        --destination-path _next/static \
+        --content-cache-control "public, max-age=31536000, immutable" \
+        --overwrite`
+        );
+    }
 }
 
 async function deployFunctionApp(functionAppName: string, resourceGroup: string): Promise<void> {

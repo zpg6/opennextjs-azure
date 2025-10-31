@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Static assets now have proper cache-control headers (\_next/static files are immutable with 1-year cache, other assets always revalidate).
+
 ## [0.1.2] - 2025-10-30
 
 ### Added
