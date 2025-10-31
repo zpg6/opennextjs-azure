@@ -1,6 +1,6 @@
 {
     "name": "opennextjs-azure",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Azure adapter for Next.js applications using OpenNext",
     "type": "module",
     "main": "./dist/index.js",
