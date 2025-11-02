@@ -1,5 +1,5 @@
 import type { OpenNextConfig } from "@opennextjs/aws/types/open-next.js";
-import type { IncrementalCache, TagCache, Queue } from "@opennextjs/aws/types/overrides.js";
+import type { IncrementalCache, TagCache, Queue, ImageLoader } from "@opennextjs/aws/types/overrides.js";
 import type { AzureConfig } from "../types/index.js";
 
 /**
@@ -23,6 +23,9 @@ export function defineAzureConfig(config: AzureConfig = {}): OpenNextConfig {
         },
         middleware: config.middleware || {
             external: false,
+        },
+        imageOptimization: {
+            loader: resolveImageLoader(config.imageLoader),
         },
         dangerous: config.dangerous,
         buildCommand: config.buildCommand,
@@ -60,6 +63,16 @@ function resolveQueue(value?: AzureConfig["queue"]) {
         return value;
     }
     return () => value as Queue;
+}
+
+function resolveImageLoader(value?: AzureConfig["imageLoader"]) {
+    if (!value || value === "azure-blob") {
+        return () => import("../overrides/imageLoader/azure-blob.js").then(m => m.default);
+    }
+    if (typeof value === "function") {
+        return value;
+    }
+    return () => value as ImageLoader;
 }
 
 /**

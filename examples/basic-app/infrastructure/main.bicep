@@ -96,6 +96,14 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
         publicAccess: 'Blob'
       }
     }
+
+    // Container for optimized images (public CDN access)
+    resource optimizedImagesContainer 'containers' = {
+      name: 'optimized-images'
+      properties: {
+        publicAccess: 'Blob'
+      }
+    }
   }
 
   // Table service for tag cache
@@ -193,6 +201,10 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'AZURE_QUEUE_NAME'
           value: queueName
+        }
+        {
+          name: 'AZURE_IMAGE_OPTIMIZATION_CACHE'
+          value: 'true'
         }
         {
           name: 'NODE_ENV'

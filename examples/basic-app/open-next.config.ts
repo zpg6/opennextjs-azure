@@ -27,6 +27,21 @@ export default {
     middleware: {
         external: false,
     },
+    imageOptimization: {
+        loader: () =>
+            import("./node_modules/opennextjs-azure/dist/overrides/imageLoader/azure-blob.js").then(m => m.default),
+        override: {
+            wrapper: () =>
+                import("./node_modules/opennextjs-azure/dist/adapters/wrappers/azure-image-optimization.js").then(
+                    m => m.default
+                ),
+            converter: () =>
+                import("./node_modules/opennextjs-azure/dist/adapters/converters/azure-http.js").then(m => m.default),
+        },
+        install: {
+            packages: ["sharp@0.33.5"],
+        },
+    },
     buildOutputPath: ".",
     appPath: ".",
 };

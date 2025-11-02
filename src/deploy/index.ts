@@ -115,7 +115,13 @@ async function checkAzureLogin(): Promise<void> {
 }
 
 async function checkRequiredProviders(applicationInsights?: boolean): Promise<void> {
-    const requiredProviders = ["Microsoft.Web", "Microsoft.Storage", "Microsoft.Compute", "Microsoft.Quota"];
+    const requiredProviders = [
+        "Microsoft.Web",
+        "Microsoft.Storage",
+        "Microsoft.Compute",
+        "Microsoft.Quota",
+        "Microsoft.ServiceLinker",
+    ];
 
     if (applicationInsights) {
         requiredProviders.push("Microsoft.AlertsManagement");
