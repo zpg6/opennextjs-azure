@@ -1,6 +1,6 @@
 {
     "name": "opennextjs-azure",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "description": "True serverless Next.js on Azure Functions with a Vercel-grade developer experience",
     "type": "module",
     "main": "./dist/index.js",
