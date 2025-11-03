@@ -51,9 +51,12 @@ program
 
 program
     .command("tail")
-    .description("Open Azure Portal Log Stream in browser (live logs)")
+    .description("Stream live logs from Application Insights (like wrangler tail)")
     .option("-n, --app-name <name>", "Application name")
     .option("-g, --resource-group <name>", "Azure resource group name")
+    .option("-f, --format <format>", "Output format: pretty or json (default: pretty)")
+    .option("--show-metadata", "Show full metadata (operation name, custom dimensions)")
+    .option("--no-timestamp", "Hide timestamps")
     .action(async options => {
         await tail(options);
     });
