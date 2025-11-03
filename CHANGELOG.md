@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Health check now validates static asset cache headers are configured correctly.
 - Health check now performs HTTP request to verify Function App is responding (with response time).
+- Added image optimization support using Azure Blob Storage as cache and sharp for processing.
 
 ### Fixed
 
