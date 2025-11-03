@@ -150,12 +150,12 @@ export async function prepareFunctions(): Promise<void> {
             // File doesn't exist, that's ok
         }
 
-        console.log("  ✓ Image optimization function added");
+        console.log(`  ${greenCheck()} Image optimization function added`);
     } catch {
         // Image optimization function doesn't exist, skip
     }
 
-    console.log(`  ${greenCheck()} Azure Functions metadata created\n`);
+    console.log(`  ${greenCheck()} Azure Functions metadata created`);
 
     console.log("Installing minimal runtime dependencies...");
     try {
@@ -182,7 +182,7 @@ export async function prepareFunctions(): Promise<void> {
         await execAsync("npm install --production --no-package-lock --loglevel=error", {
             cwd: functionsDir,
         });
-        console.log(`  ${greenCheck()} Runtime dependencies installed\n`);
+        console.log(`  ${greenCheck()} Runtime dependencies installed`);
     } catch (error: any) {
         console.error("Failed to install dependencies:", error.message);
         throw error;
@@ -192,13 +192,13 @@ export async function prepareFunctions(): Promise<void> {
     const imageOptDir2 = path.join(process.cwd(), ".open-next/image-optimization-function");
     try {
         await fs.access(imageOptDir2);
-        console.log("\nInstalling Sharp with Linux x64 binaries for image optimization...");
+        console.log("Installing Sharp with Linux x64 binaries for image optimization...");
 
         await execAsync(
             "npm install --force sharp@0.33.5 @img/sharp-linux-x64@0.33.5 @img/sharp-libvips-linux-x64@1.0.4",
             { cwd: functionsDir }
         );
-        console.log(`  ${greenCheck()} Sharp with Linux x64 binaries installed\n`);
+        console.log(`  ${greenCheck()} Sharp with Linux x64 binaries installed`);
     } catch (error: any) {
         // Image optimization not configured, skip Sharp install
     }

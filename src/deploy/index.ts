@@ -32,7 +32,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
         skipInfrastructure = false,
     } = options;
 
-    console.log(`Deploying ${appName} to Azure (${environment} environment)\n`);
+    console.log(`Deploying ${appName} to Azure (${environment} environment)`);
 
     try {
         // Preflight checks
@@ -58,7 +58,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
             console.log("Provisioning Azure infrastructure...");
             console.log(`  Resource Group: ${resourceGroup}`);
             console.log(`  Location: ${location}`);
-            console.log(`  Environment: ${environment}\n`);
+            console.log(`  Environment: ${environment}`);
 
             deploymentOutputs = await provisionInfrastructure({
                 appName,
@@ -67,21 +67,21 @@ export async function deploy(options: DeployOptions): Promise<void> {
                 environment,
                 applicationInsights: options.applicationInsights ?? false,
             });
-            console.log(`  ${greenCheck()} Infrastructure ready\n`);
+            console.log(`  ${greenCheck()} Infrastructure ready`);
         } else {
-            console.log("Skipping infrastructure provisioning\n");
+            console.log("Skipping infrastructure provisioning");
         }
 
         // Step 2: Upload static assets to Blob Storage
         console.log("Uploading static assets...");
         await uploadStaticAssets(appName, resourceGroup);
-        console.log(`  ${greenCheck()} Assets uploaded\n`);
+        console.log(`  ${greenCheck()} Assets uploaded`);
 
         // Step 3: Deploy Function App
         console.log("Deploying Function App...");
         const functionAppName = deploymentOutputs?.functionApp || `${appName}-func-${environment}`;
         await deployFunctionApp(functionAppName, resourceGroup);
-        console.log(`  ${greenCheck()} Function App deployed\n`);
+        console.log(`  ${greenCheck()} Function App deployed`);
 
         // Step 4: Postflight checks and display detailed info
         await performPostflightChecks(
@@ -127,7 +127,7 @@ async function checkRequiredProviders(applicationInsights?: boolean): Promise<vo
         requiredProviders.push("Microsoft.AlertsManagement");
     }
 
-    console.log("Checking Azure resource providers...\n");
+    console.log("Checking Azure resource providers...");
 
     for (const provider of requiredProviders) {
         const { stdout } = await execAsync(
@@ -138,7 +138,7 @@ async function checkRequiredProviders(applicationInsights?: boolean): Promise<vo
         if (state !== "Registered") {
             console.log(`Registering ${provider}...`);
             await execAsync(`az provider register --namespace ${provider} --wait`);
-            console.log(`  ${greenCheck()} ${provider} registered\n`);
+            console.log(`  ${greenCheck()} ${provider} registered`);
         }
     }
 }
@@ -174,14 +174,14 @@ async function checkQuotaAvailability(location: string, environment: string): Pr
         if (requiredSku.quota === 0) {
             console.error(`\n${redX()} Quota Error: No quota available for ${environment} environment`);
             console.error(`  Required: ${requiredSku.name}`);
-            console.error(`  Current Limit: ${requiredSku.quota}\n`);
+            console.error(`  Current Limit: ${requiredSku.quota}`);
 
             if (y1Limit > 0 && environment !== "dev") {
                 console.log(`  Suggestion: Deploy to dev environment instead (has quota: ${y1Limit})`);
-                console.log(`  Command: opennextjs-azure deploy --environment dev\n`);
+                console.log(`  Command: opennextjs-azure deploy --environment dev`);
             } else if (ep1Limit > 0 && environment === "dev") {
                 console.log(`  Suggestion: Deploy to prod environment instead (has quota: ${ep1Limit})`);
-                console.log(`  Command: opennextjs-azure deploy --environment prod\n`);
+                console.log(`  Command: opennextjs-azure deploy --environment prod`);
             } else {
                 console.log(`  To request quota increase:`);
                 console.log(
@@ -196,14 +196,14 @@ async function checkQuotaAvailability(location: string, environment: string): Pr
             throw new Error(`No ${requiredSku.type} quota available for ${environment} environment in ${location}`);
         }
 
-        console.log(`  ${greenCheck()} ${requiredSku.name}: ${requiredSku.quota} instances available\n`);
+        console.log(`  ${greenCheck()} ${requiredSku.name}: ${requiredSku.quota} instances available`);
 
         if (environment === "dev" && ep1Limit > 0) {
             console.log(
-                `  Premium tier also available (${ep1Limit} instances) - use --environment prod for better performance\n`
+                `  Premium tier also available (${ep1Limit} instances) - use --environment prod for better performance`
             );
         } else if (environment !== "dev" && y1Limit > 0) {
-            console.log(`  Consumption tier available (${y1Limit} instances) - use --environment dev for lower cost\n`);
+            console.log(`  Consumption tier available (${y1Limit} instances) - use --environment dev for lower cost`);
         }
     } catch (error: any) {
         if (error.message?.includes("No") && error.message?.includes("quota available")) {
@@ -250,7 +250,7 @@ async function checkLocation(location: string): Promise<void> {
             );
         }
 
-        console.log(`  ${greenCheck()} Region: ${locations[0].DisplayName} (${location})\n`);
+        console.log(`  ${greenCheck()} Region: ${locations[0].DisplayName} (${location})`);
     } catch (error: any) {
         if (error.message.includes("Invalid location")) {
             throw error;
@@ -284,7 +284,7 @@ async function checkBuildOutput(): Promise<void> {
         }
     }
 
-    console.log(`  ${greenCheck()} Build output structure valid\n`);
+    console.log(`  ${greenCheck()} Build output structure valid`);
 }
 
 async function checkExistingInfrastructure(appName: string, resourceGroup: string, environment: string): Promise<void> {
@@ -362,18 +362,18 @@ async function performPostflightChecks(
         console.log("\n═══════════════════════════════════════════════");
         console.log(`${greenCheck()} Deployment Complete!`);
         console.log("═══════════════════════════════════════════════");
-        console.log("\nApplication:");
+        console.log("Application:");
         console.log(`  App URL:          ${functionUrl}`);
         console.log(`  Assets URL:       ${assetsUrl}`);
         console.log(`  Status:           ${funcApp.State}`);
         console.log(`  Type:             ${funcApp.Kind}`);
 
-        console.log("\nInfrastructure:");
+        console.log("Infrastructure:");
         console.log(`  Resource Group:   ${resourceGroup}`);
         console.log(`  Region:           ${location}`);
         console.log(`  Environment:      ${environment}`);
 
-        console.log("\nConfiguration:");
+        console.log("Configuration:");
         console.log(`  App Service Plan: ${plan.Tier} (${plan.Sku})`);
         console.log(`  Storage Account:  ${storage.Name} (${storage.Sku})`);
         console.log(`  Capacity:         ${plan.Capacity || 1} instance(s)`);
