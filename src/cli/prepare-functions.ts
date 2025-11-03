@@ -98,7 +98,64 @@ export async function prepareFunctions(): Promise<void> {
 
     await fs.writeFile(path.join(functionDir, "function.json"), JSON.stringify(functionJson, null, 2));
 
-    console.log(`  ${greenCheck()} Azure Functions metadata created\n`);
+    // Add image optimization function if it exists
+    const imageOptDir = path.join(process.cwd(), ".open-next/image-optimization-function");
+    try {
+        await fs.access(imageOptDir);
+        console.log("  Adding image optimization function...");
+
+        // Create image-optimization directory in the Functions app
+        const imageFunctionDir = path.join(functionsDir, "image-optimization");
+        await fs.mkdir(imageFunctionDir, { recursive: true });
+
+        // Create function.json for image optimization route
+        const imageFunctionJson = {
+            bindings: [
+                {
+                    authLevel: "anonymous",
+                    type: "httpTrigger",
+                    direction: "in",
+                    name: "req",
+                    methods: ["get", "head"],
+                    route: "_next/image",
+                },
+                {
+                    type: "http",
+                    direction: "out",
+                    name: "res",
+                },
+            ],
+            scriptFile: "../index-image.mjs",
+            entryPoint: "handler",
+        };
+
+        await fs.writeFile(path.join(imageFunctionDir, "function.json"), JSON.stringify(imageFunctionJson, null, 2));
+
+        // Copy the image optimization handler as index-image.mjs
+        await fs.copyFile(path.join(imageOptDir, "index.mjs"), path.join(functionsDir, "index-image.mjs"));
+
+        // Copy .next directory for image optimization
+        await fs.cp(path.join(imageOptDir, ".next"), path.join(functionsDir, ".next"), {
+            recursive: true,
+            force: false,
+        });
+
+        // Copy open-next.config.mjs if it exists
+        try {
+            await fs.copyFile(
+                path.join(imageOptDir, "open-next.config.mjs"),
+                path.join(functionsDir, "open-next.config.mjs")
+            );
+        } catch {
+            // File doesn't exist, that's ok
+        }
+
+        console.log(`  ${greenCheck()} Image optimization function added`);
+    } catch {
+        // Image optimization function doesn't exist, skip
+    }
+
+    console.log(`  ${greenCheck()} Azure Functions metadata created`);
 
     console.log("Installing minimal runtime dependencies...");
     try {
@@ -125,9 +182,24 @@ export async function prepareFunctions(): Promise<void> {
         await execAsync("npm install --production --no-package-lock --loglevel=error", {
             cwd: functionsDir,
         });
-        console.log(`  ${greenCheck()} Runtime dependencies installed\n`);
+        console.log(`  ${greenCheck()} Runtime dependencies installed`);
     } catch (error: any) {
         console.error("Failed to install dependencies:", error.message);
         throw error;
+    }
+
+    // Install Sharp with correct Linux x64 binaries for Azure Functions
+    const imageOptDir2 = path.join(process.cwd(), ".open-next/image-optimization-function");
+    try {
+        await fs.access(imageOptDir2);
+        console.log("Installing Sharp with Linux x64 binaries for image optimization...");
+
+        await execAsync(
+            "npm install --force sharp@0.33.5 @img/sharp-linux-x64@0.33.5 @img/sharp-libvips-linux-x64@1.0.4",
+            { cwd: functionsDir }
+        );
+        console.log(`  ${greenCheck()} Sharp with Linux x64 binaries installed`);
+    } catch (error: any) {
+        // Image optimization not configured, skip Sharp install
     }
 }

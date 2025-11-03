@@ -5,7 +5,7 @@ import { prepareFunctions } from "./prepare-functions.js";
 import { greenCheck } from "./log.js";
 
 export async function build(configPath?: string): Promise<void> {
-    console.log("Building Next.js app for Azure...\n");
+    console.log("Building Next.js app for Azure...");
 
     const baseDir = process.cwd();
     const userConfigPath = configPath || "open-next.config.ts";
@@ -16,7 +16,7 @@ export async function build(configPath?: string): Promise<void> {
 
     // If no user config exists, create a temporary one with Azure adapters
     if (!fs.existsSync(absoluteUserConfigPath)) {
-        console.log("No open-next.config.ts found, using default Azure configuration\n");
+        console.log("No open-next.config.ts found, using default Azure configuration");
 
         // Resolve the absolute path to the opennextjs-azure package
         const { createRequire } = await import("node:module");
@@ -60,7 +60,7 @@ export default {
         if (fs.existsSync(openNextPath)) {
             console.log("Cleaning previous build output...");
             fs.rmSync(openNextPath, { recursive: true, force: true });
-            console.log(`  ${greenCheck()} Previous build cleaned\n`);
+            console.log(`  ${greenCheck()} Previous build cleaned`);
         }
 
         // Step 2: Build with OpenNext (it expects a relative config file path)
@@ -72,10 +72,10 @@ export default {
         await prepareFunctions();
 
         console.log("Build completed successfully!");
-        console.log("\nOutput: .open-next/");
+        console.log("Output: .open-next/");
         console.log("  ├── server-functions/default  (Azure Functions app)");
-        console.log("  └── assets                    (Static files)\n");
-        console.log("Next: opennextjs-azure deploy\n");
+        console.log("  └── assets                    (Static files)");
+        console.log("Next: opennextjs-azure deploy");
     } catch (error) {
         console.error("Build failed:", error);
         process.exit(1);

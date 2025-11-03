@@ -92,6 +92,54 @@ export async function scaffoldProject(targetDir: string, options: ScaffoldOption
 
     console.log("Dependencies installed\n");
 
+    // Patch page.tsx to add Azure branding
+    const pagePath = path.join(targetDir, srcDir ? "src/app/page.tsx" : "app/page.tsx");
+    let pageContent = await fs.readFile(pagePath, "utf-8");
+
+    pageContent = pageContent.replace(
+        /<Image className="dark:invert" src="\/next\.svg" alt="Next\.js logo" width=\{180\} height=\{38\} priority \/>/,
+        `<div className="flex items-center gap-4">
+                    <Image className="dark:invert" src="/next.svg" alt="Next.js logo" width={180} height={38} priority />
+                    <span className="text-2xl text-gray-400 dark:text-gray-600">+</span>
+                    <Image src="/azure.png" alt="Azure logo" width={38} height={38} priority />
+                </div>`
+    );
+
+    pageContent = pageContent.replace(
+        /href="https:\/\/vercel\.com\/new[^"]*"/,
+        'href="https://github.com/zpg6/opennextjs-azure"'
+    );
+
+    pageContent = pageContent.replace(
+        /className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background/,
+        'className="rounded-full border border-solid border-blue-400 transition-colors flex items-center justify-center bg-blue-500/10'
+    );
+
+    pageContent = pageContent.replace(/hover:bg-\[#383838\] dark:hover:bg-\[#ccc\]/, "hover:bg-blue-500/20");
+
+    pageContent = pageContent.replace(
+        /<Image className="dark:invert" src="\/vercel\.svg" alt="Vercel logomark" width=\{20\} height=\{20\} \/>/,
+        '<Image src="/azure.png" alt="Azure logomark" width={20} height={20} />'
+    );
+
+    pageContent = pageContent.replace(/>Deploy now</, ">Deploy to Azure<");
+
+    await fs.writeFile(pagePath, pageContent);
+
+    // Copy Azure logo to public directory
+    const publicDir = path.join(targetDir, "public");
+    const azureLogoSource = path.join(
+        path.dirname(new URL(import.meta.url).pathname),
+        "../../examples/basic-app/public/azure.png"
+    );
+    const azureLogoDest = path.join(publicDir, "azure.png");
+
+    try {
+        await fs.copyFile(azureLogoSource, azureLogoDest);
+    } catch (error) {
+        console.warn("Warning: Could not copy Azure logo. You can add it manually to public/azure.png");
+    }
+
     console.log("Creating open-next.config.ts...");
     const openNextConfig = `// @ts-nocheck
 export default {
@@ -108,6 +156,17 @@ export default {
     },
     middleware: {
         external: false,
+    },
+    imageOptimization: {
+        loader: () => import("./node_modules/opennextjs-azure/dist/overrides/imageLoader/azure-blob.js").then(m => m.default),
+        override: {
+            wrapper: () => import("./node_modules/opennextjs-azure/dist/adapters/wrappers/azure-image-optimization.js").then(m => m.default),
+            converter: () => import("./node_modules/opennextjs-azure/dist/adapters/converters/azure-http.js").then(m => m.default),
+        },
+        install: {
+            packages: ["@img/sharp-linux-x64@0.33.5", "sharp@0.33.5"],
+            additionalArgs: "--force --ignore-scripts",
+        },
     },
     buildOutputPath: ".",
     appPath: ".",

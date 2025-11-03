@@ -23,6 +23,7 @@ Azure Functions is Microsoft's serverless compute platform—comparable to AWS L
 | Next.js Feature                        | Azure Implementation                                            |
 | -------------------------------------- | --------------------------------------------------------------- |
 | Incremental Static Regeneration        | Azure Blob Storage                                              |
+| Image Optimization                     | Azure Blob Storage with automatic caching                       |
 | Streaming SSR                          | Azure Functions with Node.js streams                            |
 | `revalidateTag()` / `revalidatePath()` | Azure Table Storage + Queue Storage                             |
 | Fetch caching                          | Azure Blob Storage with build ID namespacing                    |
@@ -138,6 +139,12 @@ Converts between Azure Functions HTTP triggers and Next.js InternalEvent/Interna
 - **Incremental Cache:** Azure Blob Storage stores rendered pages with `[buildId]/[key].cache` structure
 - **Tag Cache:** Azure Table Storage maps tags → paths for `revalidateTag()`
 - **Revalidation Queue:** Azure Queue Storage triggers on-demand regeneration
+
+**Image Optimization:**
+
+- **Source Images:** Loaded from `assets` blob container
+- **Optimized Cache:** Processed images cached in `optimized-images` container to avoid re-processing
+- **Processing:** Processing is done with the `sharp` library, which gets added for you during deployment.
 
 **Build Process:**  
 Uses OpenNext's AWS build with Azure-specific overrides, then adds Azure Functions metadata (`host.json`, `function.json`) for v3 programming model.

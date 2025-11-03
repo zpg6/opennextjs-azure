@@ -1,5 +1,5 @@
 import type { OpenNextConfig, RoutePreloadingBehavior } from "@opennextjs/aws/types/open-next.js";
-import type { IncrementalCache, TagCache, Queue } from "@opennextjs/aws/types/overrides.js";
+import type { IncrementalCache, TagCache, Queue, ImageLoader } from "@opennextjs/aws/types/overrides.js";
 
 export type AzureDeploymentTarget = "functions" | "static-web-apps" | "container-apps";
 
@@ -22,6 +22,8 @@ export interface AzureConfig {
     incrementalCache?: "azure-blob" | IncrementalCache;
     tagCache?: "azure-table" | TagCache;
     queue?: "azure-queue" | Queue;
+    imageLoader?: "azure-blob" | ImageLoader | (() => Promise<ImageLoader>);
+    enableImageOptimizationCache?: boolean;
     routePreloadingBehavior?: RoutePreloadingBehavior;
     middleware?: OpenNextConfig["middleware"];
     dangerous?: OpenNextConfig["dangerous"];
