@@ -112,10 +112,10 @@ export async function scaffoldProject(targetDir: string, options: ScaffoldOption
 
     pageContent = pageContent.replace(
         /className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background/,
-        'className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-[#0078d4] text-white'
+        'className="rounded-full border border-solid border-blue-400 transition-colors flex items-center justify-center bg-blue-500/10'
     );
 
-    pageContent = pageContent.replace(/hover:bg-\[#383838\] dark:hover:bg-\[#ccc\]/, "hover:bg-[#106ebe]");
+    pageContent = pageContent.replace(/hover:bg-\[#383838\] dark:hover:bg-\[#ccc\]/, "hover:bg-blue-500/20");
 
     pageContent = pageContent.replace(
         /<Image className="dark:invert" src="\/vercel\.svg" alt="Vercel logomark" width=\{20\} height=\{20\} \/>/,

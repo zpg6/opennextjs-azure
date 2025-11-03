@@ -29,7 +29,7 @@ export default function Home() {
 
                 <div className="flex gap-4 items-center flex-col sm:flex-row">
                     <a
-                        className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-[#0078d4] text-white gap-2 hover:bg-[#106ebe] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
+                        className="rounded-full border border-solid border-blue-400 transition-colors flex items-center justify-center bg-blue-500/10 gap-2 hover:bg-blue-500/20 font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
                         href="https://github.com/zpg6/opennextjs-azure"
                         target="_blank"
                         rel="noopener noreferrer"
