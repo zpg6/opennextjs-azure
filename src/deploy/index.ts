@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { greenCheck, redX } from "../cli/log.js";
+import { generateBindingsBicep, generateBindingsMetadata } from "../infrastructure/bindings.js";
+import type { BindingConfig } from "../types/index.js";
 
 const execAsync = promisify(exec);
 
@@ -77,13 +79,16 @@ export async function deploy(options: DeployOptions): Promise<void> {
         await uploadStaticAssets(appName, resourceGroup);
         console.log(`  ${greenCheck()} Assets uploaded`);
 
-        // Step 3: Deploy Function App
+        // Step 3: Generate bindings metadata
+        await generateBindingsMetadataFile();
+
+        // Step 4: Deploy Function App
         console.log("Deploying Function App...");
         const functionAppName = deploymentOutputs?.functionApp || `${appName}-func-${environment}`;
         await deployFunctionApp(functionAppName, resourceGroup);
         console.log(`  ${greenCheck()} Function App deployed`);
 
-        // Step 4: Postflight checks and display detailed info
+        // Step 5: Postflight checks and display detailed info
         await performPostflightChecks(
             resourceGroup,
             functionAppName,
@@ -410,16 +415,86 @@ async function performPostflightChecks(
     }
 }
 
+async function loadAzureConfig(): Promise<{ bindings?: Record<string, BindingConfig> }> {
+    const configPath = path.join(process.cwd(), "azure.config.json");
+    try {
+        const configContent = await fs.readFile(configPath, "utf-8");
+        return JSON.parse(configContent);
+    } catch {
+        return {};
+    }
+}
+
 async function syncBicepTemplate(): Promise<void> {
-    // Sync infrastructure/main.bicep from package to ensure it matches this version
     const { fileURLToPath } = await import("node:url");
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
     const packageBicepPath = path.join(currentDir, "../infrastructure/main.bicep");
     const projectBicepPath = path.join(process.cwd(), "infrastructure/main.bicep");
 
-    const bicepContent = await fs.readFile(packageBicepPath, "utf-8");
+    let bicepContent = await fs.readFile(packageBicepPath, "utf-8");
+
+    const config = await loadAzureConfig();
+    if (config.bindings && Object.keys(config.bindings).length > 0) {
+        console.log(`  Generating infrastructure for ${Object.keys(config.bindings).length} binding(s)...`);
+        const { modules, envVars, outputs } = generateBindingsBicep(config.bindings);
+
+        const functionAppSectionEnd = bicepContent.indexOf("// Outputs");
+        if (functionAppSectionEnd === -1) {
+            throw new Error("Could not find '// Outputs' section in main.bicep template");
+        }
+
+        bicepContent =
+            bicepContent.slice(0, functionAppSectionEnd) +
+            `\n// Bindings\n${modules}\n\n` +
+            bicepContent.slice(functionAppSectionEnd);
+
+        const appSettingsMatch = bicepContent.match(/appSettings: concat\(\[/);
+        if (!appSettingsMatch) {
+            throw new Error("Could not find appSettings concat in main.bicep template");
+        }
+
+        const appSettingsStartIndex = appSettingsMatch.index! + appSettingsMatch[0].length;
+        const beforeAppSettings = bicepContent.slice(0, appSettingsStartIndex);
+        const afterAppSettings = bicepContent.slice(appSettingsStartIndex);
+
+        const nextSectionIndex = afterAppSettings.indexOf("], enableApplicationInsights");
+        if (nextSectionIndex === -1) {
+            throw new Error("Could not find end of base appSettings in main.bicep template");
+        }
+
+        const baseSettings = afterAppSettings.slice(0, nextSectionIndex);
+        const restOfFile = afterAppSettings.slice(nextSectionIndex);
+
+        bicepContent = beforeAppSettings + baseSettings + "\n" + envVars.join("\n") + restOfFile;
+
+        const outputsSectionEnd = bicepContent.lastIndexOf("}");
+        if (outputsSectionEnd === -1) {
+            throw new Error("Could not find end of outputs section in main.bicep template");
+        }
+
+        bicepContent =
+            bicepContent.slice(0, outputsSectionEnd) +
+            "\n\n// Binding outputs\n" +
+            outputs.join("\n") +
+            "\n" +
+            bicepContent.slice(outputsSectionEnd);
+    }
+
     await fs.mkdir(path.dirname(projectBicepPath), { recursive: true });
     await fs.writeFile(projectBicepPath, bicepContent);
+}
+
+async function generateBindingsMetadataFile(): Promise<void> {
+    const config = await loadAzureConfig();
+    if (!config.bindings || Object.keys(config.bindings).length === 0) {
+        return;
+    }
+
+    const metadata = generateBindingsMetadata(config.bindings);
+    const metadataPath = path.join(process.cwd(), ".open-next/server-functions/default/.bindings.json");
+
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+    console.log(`  ${greenCheck()} Generated bindings metadata`);
 }
 
 async function provisionInfrastructure(options: {
