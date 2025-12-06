@@ -45,6 +45,7 @@ program
     .option("-l, --location <location>", "Azure region")
     .option("-e, --environment <env>", "Environment: dev, staging, or prod")
     .option("--skip-infrastructure", "Skip infrastructure provisioning")
+    .option("--skip-resource-checks", "Skip Azure resource validation checks (permissions, quota, providers)")
     .action(async options => {
         await deploy(options);
     });

@@ -20,6 +20,7 @@ interface DeployOptions {
     location?: string;
     environment?: "dev" | "staging" | "prod";
     skipInfrastructure?: boolean;
+    skipResourceChecks?: boolean;
     applicationInsights?: boolean;
 }
 
@@ -30,19 +31,26 @@ export async function deploy(options: DeployOptions): Promise<void> {
         location = "eastus",
         environment = "dev",
         skipInfrastructure = false,
+        skipResourceChecks = false,
     } = options;
 
     console.log(`Deploying ${appName} to Azure (${environment} environment)`);
 
     try {
-        // Preflight checks
+        // Critical checks (always run)
         await checkAzureCLI();
         await checkAzureLogin();
-        await checkAzureSubscriptionPermissions();
-        await checkLocation(location);
-        await checkRequiredProviders(options.applicationInsights);
-        await checkQuotaAvailability(location, environment);
         await checkBuildOutput();
+
+        // Resource checks (can be skipped with --skip-resource-checks)
+        if (!skipResourceChecks) {
+            await checkAzureSubscriptionPermissions();
+            await checkLocation(location);
+            await checkRequiredProviders(options.applicationInsights);
+            await checkQuotaAvailability(location, environment);
+        } else {
+            console.log("Skipping resource checks (--skip-resource-checks)");
+        }
 
         // Check existing infrastructure if skipping provisioning
         if (skipInfrastructure) {

@@ -9,6 +9,7 @@ export async function deploy(options: {
     location?: string;
     environment?: "dev" | "staging" | "prod";
     skipInfrastructure?: boolean;
+    skipResourceChecks?: boolean;
 }): Promise<void> {
     const cwd = process.cwd();
 
@@ -58,6 +59,7 @@ export async function deploy(options: {
         location: resourceGroupLocation || options.location || config.location || "eastus",
         environment,
         skipInfrastructure: options.skipInfrastructure,
+        skipResourceChecks: options.skipResourceChecks,
         applicationInsights: config.applicationInsights ?? false,
     });
 }
