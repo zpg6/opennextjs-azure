@@ -445,8 +445,8 @@ async function provisionInfrastructure(options: {
         // Verify location matches for existing resource group
         const { stdout: rgLocation } = await execAsync(`az group show --name ${resourceGroup} --query location -o tsv`);
         if (rgLocation.trim() !== location) {
-            console.log(
-                `  ${colors.yellow}Note:${colors.reset} Resource group "${resourceGroup}" exists in ${rgLocation.trim()}, using that location instead of ${location}`
+            console.warn(
+                `  ${colors.yellow}Warning:${colors.reset} Resource group "${resourceGroup}" exists in ${rgLocation.trim()}, but ${location} was specified`
             );
         }
     } else {
