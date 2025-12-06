@@ -439,8 +439,20 @@ async function provisionInfrastructure(options: {
 }): Promise<any> {
     const { appName, resourceGroup, location, environment, applicationInsights } = options;
 
-    // Create resource group
-    await execAsync(`az group create --name ${resourceGroup} --location ${location}`);
+    // Check if resource group exists
+    const { stdout: rgExists } = await execAsync(`az group exists --name ${resourceGroup}`);
+    if (rgExists.trim() === "true") {
+        // Verify location matches for existing resource group
+        const { stdout: rgLocation } = await execAsync(`az group show --name ${resourceGroup} --query location -o tsv`);
+        if (rgLocation.trim() !== location) {
+            console.log(
+                `  ${colors.yellow}Note:${colors.reset} Resource group "${resourceGroup}" exists in ${rgLocation.trim()}, using that location instead of ${location}`
+            );
+        }
+    } else {
+        // Create resource group only if it doesn't exist
+        await execAsync(`az group create --name ${resourceGroup} --location ${location}`);
+    }
 
     // Deploy Bicep template from project root
     const bicepPath = path.join(process.cwd(), "infrastructure/main.bicep");
