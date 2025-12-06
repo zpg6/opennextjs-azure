@@ -188,7 +188,8 @@ opennextjs-azure deploy \
   [--resource-group <name>] \
   [--location <region>] \
   [--environment dev|staging|prod] \
-  [--skip-infrastructure]
+  [--skip-infrastructure] \
+  [--skip-resource-checks]
 
 # View live logs in Azure Portal
 opennextjs-azure tail \
