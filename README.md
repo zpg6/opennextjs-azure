@@ -149,6 +149,44 @@ Converts between Azure Functions HTTP triggers and Next.js InternalEvent/Interna
 **Build Process:**  
 Uses OpenNext's AWS build with Azure-specific overrides, then adds Azure Functions metadata (`host.json`, `function.json`) for v3 programming model.
 
+## Database & Service Bindings
+
+Type-safe bindings for Azure services. Configure once in `azure.config.json`, access everywhere with full type safety.
+
+```json
+{
+    "bindings": {
+        "DB": {
+            "type": "cosmos-sql",
+            "databaseName": "mydb",
+            "throughput": 400
+        },
+        "CACHE": {
+            "type": "redis",
+            "sku": "Basic",
+            "capacity": 0
+        }
+    }
+}
+```
+
+```typescript
+// app/api/users/route.ts
+import { getBinding } from "opennextjs-azure/bindings";
+
+export async function GET() {
+    const db = getBinding<"cosmos-sql">("DB");
+
+    const database = db.database("mydb");
+    const container = database.container("users");
+    const { resources } = await container.items.readAll().fetchAll();
+
+    return Response.json(resources);
+}
+```
+
+Infrastructure provisioned automatically. Supports: Cosmos DB, Postgres, MySQL, Redis, Service Bus, Event Hub.
+
 ## CLI Commands
 
 ### `init --scaffold` (Recommended for new projects)
