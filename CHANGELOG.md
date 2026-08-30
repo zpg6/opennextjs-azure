@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-30
+
 ### Fixed
 
 - POST/PUT/PATCH/DELETE requests returned 500. The converter called the v4-only `request.arrayBuffer()`; it now reads `bufferBody`/`rawBody` under the v3 model and handles both models' header shapes.
