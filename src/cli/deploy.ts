@@ -1,4 +1,5 @@
 import { deploy as deployToAzure } from "../deploy/index.js";
+import { validateAzureNames } from "../deploy/validate.js";
 import { selectResourceGroup, selectEnvironment } from "../deploy/prompts.js";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -41,6 +42,7 @@ export async function deploy(options: {
     if (!resourceGroup) {
         const result = await selectResourceGroup();
         resourceGroup = result.name;
+        validateAzureNames({ resourceGroup });
 
         if (result.isNew) {
             resourceGroupLocation = result.location;
@@ -53,10 +55,14 @@ export async function deploy(options: {
     // Interactive environment selection if not specified
     const environment = options.environment || config.environment || (await selectEnvironment());
 
+    const appName = options.appName || config.appName || path.basename(cwd);
+    const location = resourceGroupLocation || options.location || config.location || "eastus";
+    validateAzureNames({ appName, resourceGroup, location, environment });
+
     await deployToAzure({
-        appName: options.appName || config.appName || path.basename(cwd),
+        appName,
         resourceGroup: resourceGroup!,
-        location: resourceGroupLocation || options.location || config.location || "eastus",
+        location,
         environment,
         skipInfrastructure: options.skipInfrastructure,
         skipResourceChecks: options.skipResourceChecks,

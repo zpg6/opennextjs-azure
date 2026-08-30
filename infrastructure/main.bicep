@@ -136,6 +136,9 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
   kind: 'functionapp'
   properties: {
     reserved: true // Linux
+    // Elastic Premium defaults to a max of 1 worker when this is omitted,
+    // which pins the prod plan to a single instance. Y1 ignores it.
+    maximumElasticWorkerCount: environment == 'prod' ? 20 : 1
   }
 }
 
@@ -170,12 +173,10 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: 'node'
         }
         {
-          name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '~${nodeVersion}'
-        }
-        {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '1'
+          // A second worker process buys resilience to GC stalls; SSR is
+          // single-threaded per worker. Memory-bounded on Y1 (1.5 GB).
+          name: 'FUNCTIONS_WORKER_PROCESS_COUNT'
+          value: '2'
         }
         {
           name: 'AzureWebJobsDisableHomepage'
@@ -223,6 +224,12 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
       
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
+      // Always-ready SSR on Elastic Premium; both stay null on Y1.
+      // WEBSITE_RUN_FROM_PACKAGE is deliberately absent: '1' is unsupported
+      // on Linux Consumption, and the deploy step sets the blob-URL form
+      // that provisioning must not overwrite.
+      minimumElasticInstanceCount: environment == 'prod' ? 1 : null
+      preWarmedInstanceCount: environment == 'prod' ? 1 : null
       cors: {
         allowedOrigins: ['*']
       }

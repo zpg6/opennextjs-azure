@@ -27,6 +27,18 @@ export default {
     middleware: {
         external: false,
     },
+    revalidate: {
+        override: {
+            wrapper: () =>
+                import("./node_modules/opennextjs-azure/dist/adapters/wrappers/azure-queue-revalidate.js").then(
+                    m => m.default
+                ),
+            converter: () =>
+                import("./node_modules/opennextjs-azure/dist/adapters/converters/azure-queue-revalidate.js").then(
+                    m => m.default
+                ),
+        },
+    },
     imageOptimization: {
         loader: () =>
             import("./node_modules/opennextjs-azure/dist/overrides/imageLoader/azure-blob.js").then(m => m.default),

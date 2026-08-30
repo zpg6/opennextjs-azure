@@ -23,7 +23,13 @@ async function convertFromAzureHttp(request: HttpRequest): Promise<InternalEvent
     });
 
     const headers: Record<string, string> = {};
-    for (const [key, value] of Object.entries(request.headers)) {
+    // v4 model exposes a WHATWG Headers object (no enumerable own properties);
+    // the v3 (function.json) model exposes a plain object.
+    const headerEntries =
+        typeof (request.headers as any)?.entries === "function"
+            ? ((request.headers as any).entries() as Iterable<[string, string]>)
+            : Object.entries(request.headers as unknown as Record<string, string>);
+    for (const [key, value] of headerEntries) {
         if (value) {
             headers[key.toLowerCase()] = value;
         }
@@ -40,8 +46,10 @@ async function convertFromAzureHttp(request: HttpRequest): Promise<InternalEvent
         });
     }
 
-    const body =
-        request.method !== "GET" && request.method !== "HEAD" ? Buffer.from(await request.arrayBuffer()) : undefined;
+    const body = request.method !== "GET" && request.method !== "HEAD" ? await readRequestBody(request) : undefined;
+
+    // x-forwarded-for may be a comma-separated proxy chain; the client is the first hop
+    const remoteAddress = (headers["x-forwarded-for"] || headers["x-real-ip"] || "::1").split(",")[0].trim();
 
     return {
         type: "core",
@@ -52,8 +60,28 @@ async function convertFromAzureHttp(request: HttpRequest): Promise<InternalEvent
         headers,
         query,
         cookies,
-        remoteAddress: headers["x-forwarded-for"] || headers["x-real-ip"] || "::1",
+        remoteAddress,
     };
+}
+
+/**
+ * Reads the request body across programming models: v4 exposes arrayBuffer(),
+ * the v3 (function.json) model exposes bufferBody/rawBody instead.
+ */
+async function readRequestBody(request: HttpRequest): Promise<Buffer | undefined> {
+    const req = request as any;
+    if (typeof req.arrayBuffer === "function") {
+        return Buffer.from(await req.arrayBuffer());
+    }
+    if (req.bufferBody != null) {
+        return Buffer.isBuffer(req.bufferBody) ? req.bufferBody : Buffer.from(req.bufferBody);
+    }
+    if (req.rawBody != null) {
+        return Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(String(req.rawBody));
+    }
+    // No JSON.stringify fallback for a parsed body object: re-serializing
+    // changes the original bytes and breaks webhook signature verification.
+    return undefined;
 }
 
 function normalizePath(pathname: string): string {
@@ -74,16 +102,21 @@ function normalizePath(pathname: string): string {
 async function convertToAzureHttp(result: InternalResult): Promise<{
     status: number;
     headers: Record<string, string>;
-    body?: string;
+    cookies: string[];
+    body?: Buffer;
 }> {
-    // Normalize response headers
+    // Normalize response headers. Set-Cookie must not be comma-folded
+    // (RFC 6265), so it is returned separately for the wrapper to emit.
     const headers: Record<string, string> = {};
+    const cookies: string[] = [];
     for (const [key, value] of Object.entries(result.headers)) {
         if (value === null || value === undefined) {
             continue;
         }
 
-        if (Array.isArray(value)) {
+        if (key.toLowerCase() === "set-cookie") {
+            cookies.push(...(Array.isArray(value) ? value.map(String) : [String(value)]));
+        } else if (Array.isArray(value)) {
             headers[key] = value.join(", ");
         } else {
             headers[key] = String(value);
@@ -91,7 +124,7 @@ async function convertToAzureHttp(result: InternalResult): Promise<{
     }
 
     // Read the response body stream
-    let body: string | undefined;
+    let body: Buffer | undefined;
     if (result.body) {
         const chunks: Uint8Array[] = [];
         const reader = result.body.getReader();
@@ -109,13 +142,13 @@ async function convertToAzureHttp(result: InternalResult): Promise<{
             reader.releaseLock();
         }
 
-        const buffer = Buffer.concat(chunks);
-        body = result.isBase64Encoded ? buffer.toString("base64") : buffer.toString("utf8");
+        body = Buffer.concat(chunks);
     }
 
     return {
         status: result.statusCode,
         headers,
+        cookies,
         body,
     };
 }

@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { greenCheck, redX } from "../cli/log.js";
+import { seedCacheAssets } from "./seed-cache.js";
 
 const execAsync = promisify(exec);
 
@@ -59,6 +60,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
 
         // Step 1: Provision infrastructure (or skip if updating app only)
         let deploymentOutputs;
+        const expectedFunctionAppName = `${appName}-func-${environment}`;
         if (!skipInfrastructure) {
             // Sync bicep template from package (ensures infrastructure matches package version)
             await syncBicepTemplate();
@@ -68,6 +70,13 @@ export async function deploy(options: DeployOptions): Promise<void> {
             console.log(`  Location: ${location}`);
             console.log(`  Environment: ${environment}`);
 
+            // The template replaces ALL app settings, which deletes the
+            // WEBSITE_RUN_FROM_PACKAGE blob URL the previous deploy set.
+            // Capture it and restore right after, so a deploy that fails
+            // between provisioning and the zip push leaves the running
+            // package intact.
+            const runFromPackage = await readRunFromPackage(resourceGroup, expectedFunctionAppName);
+
             deploymentOutputs = await provisionInfrastructure({
                 appName,
                 resourceGroup,
@@ -75,15 +84,29 @@ export async function deploy(options: DeployOptions): Promise<void> {
                 environment,
                 applicationInsights: options.applicationInsights ?? false,
             });
+
+            if (runFromPackage?.startsWith("http")) {
+                await execAsync(
+                    `az functionapp config appsettings set --resource-group ${resourceGroup} --name ${expectedFunctionAppName} --settings "WEBSITE_RUN_FROM_PACKAGE=${runFromPackage}" --output none`
+                );
+            }
             console.log(`  ${greenCheck()} Infrastructure ready`);
         } else {
             console.log("Skipping infrastructure provisioning");
         }
 
+        const storageAccountName = deploymentOutputs?.storageAccount || (await getStorageAccountName(resourceGroup));
+
         // Step 2: Upload static assets to Blob Storage
         console.log("Uploading static assets...");
-        await uploadStaticAssets(appName, resourceGroup);
+        await uploadStaticAssets(storageAccountName);
         console.log(`  ${greenCheck()} Assets uploaded`);
+
+        // Step 2b: Seed ISR cache + tag table from the build output.
+        // The "original"-mode tag cache is a no-op until prepopulated.
+        console.log("Seeding ISR cache and tag table...");
+        await seedRuntimeCaches(resourceGroup, storageAccountName);
+        console.log(`  ${greenCheck()} Cache seeded`);
 
         // Step 3: Deploy Function App
         console.log("Deploying Function App...");
@@ -173,7 +196,7 @@ async function checkQuotaAvailability(location: string, environment: string): Pr
 
         const skuMap: Record<string, { name: string; quota: number; type: string }> = {
             dev: { name: "Y1 (Consumption)", quota: y1Limit, type: "Dynamic" },
-            staging: { name: "EP1 (Elastic Premium)", quota: ep1Limit, type: "ElasticPremium" },
+            staging: { name: "Y1 (Consumption)", quota: y1Limit, type: "Dynamic" },
             prod: { name: "EP1 (Elastic Premium)", quota: ep1Limit, type: "ElasticPremium" },
         };
 
@@ -461,7 +484,7 @@ async function provisionInfrastructure(options: {
     const { stdout } = await execAsync(
         `az deployment group create \
       --resource-group ${resourceGroup} \
-      --template-file ${bicepPath} \
+      --template-file "${bicepPath}" \
       --parameters appName=${appName} environment=${environment} enableApplicationInsights=${enableAppInsights} \
       --query 'properties.outputs.deploymentInfo.value' \
       --output json`
@@ -492,26 +515,50 @@ async function patchCSSForBlobStorage(assetsPath: string): Promise<void> {
     }
 }
 
-async function uploadStaticAssets(appName: string, resourceGroup: string): Promise<void> {
+async function getStorageAccountName(resourceGroup: string): Promise<string> {
+    const { stdout } = await execAsync(
+        `az storage account list --resource-group ${resourceGroup} --query "[0].name" -o tsv`
+    );
+    const name = stdout.trim();
+    if (!name) {
+        throw new Error(`No storage account found in resource group "${resourceGroup}"`);
+    }
+    return name;
+}
+
+async function readRunFromPackage(resourceGroup: string, functionAppName: string): Promise<string | null> {
+    try {
+        const { stdout } = await execAsync(
+            `az functionapp config appsettings list --resource-group ${resourceGroup} --name ${functionAppName} --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value | [0]" -o tsv`
+        );
+        return stdout.trim() || null;
+    } catch {
+        return null; // app doesn't exist yet
+    }
+}
+
+async function seedRuntimeCaches(resourceGroup: string, storageAccountName: string): Promise<void> {
+    const { stdout: connectionString } = await execAsync(
+        `az storage account show-connection-string --resource-group ${resourceGroup} --name ${storageAccountName} --query connectionString -o tsv`
+    );
+    await seedCacheAssets(connectionString.trim());
+}
+
+async function uploadStaticAssets(storageAccountName: string): Promise<void> {
     const assetsPath = path.join(process.cwd(), ".open-next/assets");
 
     // Patch CSS files to include /assets path for blob storage URLs
     await patchCSSForBlobStorage(assetsPath);
-
-    // Get storage account name
-    const { stdout } = await execAsync(
-        `az storage account list --resource-group ${resourceGroup} --query "[0].name" -o tsv`
-    );
-    const storageAccountName = stdout.trim();
 
     // Upload all assets with default short-term caching first
     await execAsync(
         `az storage blob upload-batch \
       --account-name ${storageAccountName} \
       --destination assets \
-      --source ${assetsPath} \
+      --source "${assetsPath}" \
       --content-cache-control "public, max-age=0, must-revalidate" \
-      --overwrite`
+      --overwrite`,
+        { maxBuffer: 100 * 1024 * 1024 }
     );
 
     // Override _next/static assets with long-term caching (immutable, content-hashed files)
@@ -521,10 +568,11 @@ async function uploadStaticAssets(appName: string, resourceGroup: string): Promi
             `az storage blob upload-batch \
         --account-name ${storageAccountName} \
         --destination assets \
-        --source ${nextStaticPath} \
+        --source "${nextStaticPath}" \
         --destination-path _next/static \
         --content-cache-control "public, max-age=31536000, immutable" \
-        --overwrite`
+        --overwrite`,
+            { maxBuffer: 100 * 1024 * 1024 }
         );
     }
 }
@@ -534,7 +582,10 @@ async function deployFunctionApp(functionAppName: string, resourceGroup: string)
 
     // Create zip of function app
     const zipPath = path.join(process.cwd(), ".open-next/function-app.zip");
-    await execAsync(`cd ${functionsPath} && zip -r ${zipPath} . -q`, {
+    // "zip -r" merges into an existing archive, so a leftover zip from a
+    // failed deploy would bring back files deleted since the last build.
+    await fs.rm(zipPath, { force: true });
+    await execAsync(`cd "${functionsPath}" && zip -r "${zipPath}" . -q`, {
         maxBuffer: 100 * 1024 * 1024,
     });
 
@@ -543,7 +594,7 @@ async function deployFunctionApp(functionAppName: string, resourceGroup: string)
         `az functionapp deployment source config-zip \
       --resource-group ${resourceGroup} \
       --name ${functionAppName} \
-      --src ${zipPath}`,
+      --src "${zipPath}"`,
         {
             maxBuffer: 100 * 1024 * 1024,
         }

@@ -9,11 +9,11 @@ export default defineBuildConfig({
         "src/overrides/tagCache/azure-table",
         "src/overrides/queue/azure-queue",
         "src/overrides/imageLoader/azure-blob",
-        "src/overrides/imageOptimization/azure-cached",
         "src/adapters/wrappers/azure-functions",
         "src/adapters/wrappers/azure-image-optimization",
+        "src/adapters/wrappers/azure-queue-revalidate",
         "src/adapters/converters/azure-http",
-        "src/adapters/image-optimization",
+        "src/adapters/converters/azure-queue-revalidate",
     ],
     declaration: true,
     clean: true,
@@ -31,7 +31,7 @@ export default defineBuildConfig({
     rollup: {
         emitCJS: false,
         esbuild: {
-            target: "node18",
+            target: "node20",
             minify: false,
         },
         output: {

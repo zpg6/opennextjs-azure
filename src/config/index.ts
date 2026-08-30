@@ -27,6 +27,16 @@ export function defineAzureConfig(config: AzureConfig = {}): OpenNextConfig {
         imageOptimization: {
             loader: resolveImageLoader(config.imageLoader),
         },
+        // Upstream's declared revalidate converter type says {host, url} but
+        // its runtime handler reads event.records[]. These match the runtime,
+        // hence the casts.
+        revalidate: {
+            override: {
+                wrapper: (() => import("../adapters/wrappers/azure-queue-revalidate.js").then(m => m.default)) as any,
+                converter: (() =>
+                    import("../adapters/converters/azure-queue-revalidate.js").then(m => m.default)) as any,
+            },
+        },
         dangerous: config.dangerous,
         buildCommand: config.buildCommand,
         buildOutputPath: config.buildOutputPath || ".",

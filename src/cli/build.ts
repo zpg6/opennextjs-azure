@@ -23,11 +23,14 @@ export async function build(configPath?: string): Promise<void> {
         const require = createRequire(import.meta.url);
         const packagePath = path.dirname(require.resolve("opennextjs-azure/package.json"));
 
-        const wrapperPath = path.join(packagePath, "dist/adapters/wrappers/azure-functions.js");
-        const converterPath = path.join(packagePath, "dist/adapters/converters/azure-http.js");
-        const incrementalCachePath = path.join(packagePath, "dist/overrides/incrementalCache/azure-blob.js");
-        const tagCachePath = path.join(packagePath, "dist/overrides/tagCache/azure-table.js");
-        const queuePath = path.join(packagePath, "dist/overrides/queue/azure-queue.js");
+        // Forward slashes: these paths land inside a generated JS string
+        // literal, where Windows backslashes become escape sequences.
+        const distPath = (rel: string) => path.join(packagePath, rel).split(path.sep).join("/");
+        const wrapperPath = distPath("dist/adapters/wrappers/azure-functions.js");
+        const converterPath = distPath("dist/adapters/converters/azure-http.js");
+        const incrementalCachePath = distPath("dist/overrides/incrementalCache/azure-blob.js");
+        const tagCachePath = distPath("dist/overrides/tagCache/azure-table.js");
+        const queuePath = distPath("dist/overrides/queue/azure-queue.js");
 
         tempConfigPath = path.join(baseDir, "open-next.config.ts");
         const configContent = `// @ts-nocheck
@@ -45,6 +48,12 @@ export default {
     },
     middleware: {
         external: false,
+    },
+    revalidate: {
+        override: {
+            wrapper: () => import("${distPath("dist/adapters/wrappers/azure-queue-revalidate.js")}").then(m => m.default),
+            converter: () => import("${distPath("dist/adapters/converters/azure-queue-revalidate.js")}").then(m => m.default),
+        },
     },
     buildOutputPath: ".",
     appPath: ".",

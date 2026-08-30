@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { Command } from "commander";
+import { createRequire } from "node:module";
+import { Command, Option } from "commander";
 import { init } from "./init.js";
 import { build } from "./build.js";
 import { deploy } from "./deploy.js";
@@ -7,12 +8,15 @@ import { tail } from "./tail.js";
 import { health } from "./health.js";
 import { deleteResourceGroup } from "./delete.js";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../../package.json");
+
 const program = new Command();
 
 program
     .name("opennextjs-azure")
     .description("CLI tool for building and deploying Next.js apps to Azure")
-    .version("0.1.2");
+    .version(version);
 
 program
     .command("init")
@@ -43,7 +47,7 @@ program
     .option("-n, --app-name <name>", "Application name (overrides azure.config.json)")
     .option("-g, --resource-group <name>", "Azure resource group name")
     .option("-l, --location <location>", "Azure region")
-    .option("-e, --environment <env>", "Environment: dev, staging, or prod")
+    .addOption(new Option("-e, --environment <env>", "Deployment environment").choices(["dev", "staging", "prod"]))
     .option("--skip-infrastructure", "Skip infrastructure provisioning")
     .option("--skip-resource-checks", "Skip Azure resource validation checks (permissions, quota, providers)")
     .action(async options => {

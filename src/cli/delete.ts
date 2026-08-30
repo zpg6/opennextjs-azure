@@ -1,5 +1,6 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { validateAzureNames } from "../deploy/validate.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promptForInput } from "../deploy/prompts.js";
@@ -16,7 +17,8 @@ const colors = {
 export async function deleteResourceGroup(options: {
     resourceGroup?: string;
     yes?: boolean;
-    noWait?: boolean;
+    // commander maps --no-wait to `wait: false`
+    wait?: boolean;
 }): Promise<void> {
     const cwd = process.cwd();
 
@@ -40,6 +42,8 @@ export async function deleteResourceGroup(options: {
         console.error("  Provide --resource-group\n");
         process.exit(1);
     }
+
+    validateAzureNames({ resourceGroup });
 
     try {
         const { stdout } = await execAsync(
@@ -71,7 +75,7 @@ export async function deleteResourceGroup(options: {
 
     console.log(`\nDeleting resource group "${resourceGroup}"...`);
 
-    if (options.noWait) {
+    if (options.wait === false) {
         console.log("Initiating deletion in the background...\n");
 
         try {

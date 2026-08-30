@@ -1,5 +1,6 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { validateAzureNames } from "../deploy/validate.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { greenCheck, redX } from "./log.js";
@@ -39,6 +40,7 @@ export async function health(options?: { appName?: string; resourceGroup?: strin
     const appName = options?.appName || config.appName;
     const resourceGroup = options?.resourceGroup || config.resourceGroup;
     const environment = config.environment || "dev";
+    validateAzureNames({ appName, resourceGroup, environment });
 
     if (!appName || !resourceGroup) {
         console.error(`${redX()} Missing required information!`);

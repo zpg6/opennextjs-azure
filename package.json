@@ -38,6 +38,14 @@
         "./overrides/queue/azure-queue.js": {
             "import": "./dist/overrides/queue/azure-queue.js",
             "types": "./dist/overrides/queue/azure-queue.d.ts"
+        },
+        "./adapters/wrappers/azure-queue-revalidate.js": {
+            "import": "./dist/adapters/wrappers/azure-queue-revalidate.js",
+            "types": "./dist/adapters/wrappers/azure-queue-revalidate.d.ts"
+        },
+        "./adapters/converters/azure-queue-revalidate.js": {
+            "import": "./dist/adapters/converters/azure-queue-revalidate.js",
+            "types": "./dist/adapters/converters/azure-queue-revalidate.d.ts"
         }
     },
     "files": [
@@ -49,9 +57,10 @@
         "dev": "unbuild --stub",
         "clean": "rimraf dist",
         "lint": "eslint src --ext .ts",
-        "test": "vitest",
+        "test": "vitest run",
         "typecheck": "tsc --noEmit",
-        "format": "prettier --write ."
+        "format": "prettier --write .",
+        "test:watch": "vitest"
     },
     "keywords": [
         "nextjs",
@@ -93,6 +102,6 @@
         "next": ">=13.4.0"
     },
     "engines": {
-        "node": ">=18.0.0"
+        "node": ">=20.0.0"
     }
 }

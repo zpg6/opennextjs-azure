@@ -1,4 +1,4 @@
-import { BlobServiceClient, ContainerClient } from "@azure/storage-blob";
+import { BlobServiceClient, ContainerClient, StorageSharedKeyCredential } from "@azure/storage-blob";
 import type {
     CacheEntryType,
     CacheValue,
@@ -6,6 +6,15 @@ import type {
     WithLastModified,
 } from "@opennextjs/aws/types/overrides.js";
 import { getAzureConfig } from "../../config/index.js";
+
+/**
+ * Retry policy for blob calls on the request hot path. The SDK's default
+ * first retry waits 4s; fail fast instead and let cache layers treat
+ * errors as misses. Shared with the image-optimization wrapper.
+ */
+export const BLOB_RETRY_OPTIONS = {
+    retryOptions: { maxTries: 3, retryDelayInMs: 300, maxRetryDelayInMs: 2000, tryTimeoutInMs: 10000 },
+};
 
 /**
  * Azure Blob Storage implementation of IncrementalCache.
@@ -23,14 +32,20 @@ class AzureBlobIncrementalCache implements IncrementalCache {
         const accountName = storage.accountName;
         const accountKey = storage.accountKey;
 
+        const clientOptions = BLOB_RETRY_OPTIONS;
+
         if (connectionString) {
-            const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+            const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString, clientOptions);
             this.containerClient = blobServiceClient.getContainerClient(storage.containerName || "nextjs-cache");
         } else if (accountName && accountKey) {
-            const blobServiceClient = new BlobServiceClient(`https://${accountName}.blob.core.windows.net`, {
-                accountName,
-                accountKey,
-            } as any);
+            // The SDK needs a real credential object here; a plain
+            // {accountName, accountKey} object gets anonymous access.
+            const credential = new StorageSharedKeyCredential(accountName, accountKey);
+            const blobServiceClient = new BlobServiceClient(
+                `https://${accountName}.blob.core.windows.net`,
+                credential,
+                clientOptions
+            );
             this.containerClient = blobServiceClient.getContainerClient(storage.containerName || "nextjs-cache");
         }
     }
@@ -38,13 +53,16 @@ class AzureBlobIncrementalCache implements IncrementalCache {
     /**
      * Builds the blob key path, mimicking S3 structure:
      * [prefix]/[__fetch]/[buildId]/[key].[extension]
+     *
+     * Keys must match the .open-next/cache layout the seeder uploads, so no
+     * container-name prefix and no leading slash.
      */
     private buildBlobKey(key: string, cacheType: CacheEntryType = "cache"): string {
-        const { storage } = getAzureConfig();
         const { NEXT_BUILD_ID } = process.env;
-        const prefix = storage.containerName || "";
+        const prefix = process.env.AZURE_CACHE_KEY_PREFIX || "";
         const type = cacheType === "fetch" ? "__fetch" : "";
-        return [prefix, type, NEXT_BUILD_ID, cacheType === "fetch" ? key : `${key}.${cacheType}`]
+        const cleanKey = key.replace(/^\/+/, "");
+        return [prefix, type, NEXT_BUILD_ID, cacheType === "fetch" ? cleanKey : `${cleanKey}.${cacheType}`]
             .filter(Boolean)
             .join("/");
     }
@@ -94,7 +112,8 @@ class AzureBlobIncrementalCache implements IncrementalCache {
             const blobClient = this.containerClient.getBlockBlobClient(blobKey);
 
             const content = JSON.stringify(value);
-            await blobClient.upload(content, content.length, {
+            // upload() takes a byte length, not the UTF-16 code-unit count.
+            await blobClient.upload(content, Buffer.byteLength(content), {
                 blobHTTPHeaders: {
                     blobContentType: "application/json",
                 },

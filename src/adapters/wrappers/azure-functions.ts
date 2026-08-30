@@ -1,21 +1,107 @@
 import type { InternalEvent, InternalResult, StreamCreator } from "@opennextjs/aws/types/open-next.js";
 import type { Wrapper, WrapperHandler } from "@opennextjs/aws/types/overrides.js";
 import { Writable } from "node:stream";
+import { readFileSync } from "node:fs";
 
 // HTTP status codes that should not have a response body
 const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
 
-// Static asset patterns that should be served from blob storage
+// Fallback patterns when no asset manifest is present
 const STATIC_ASSET_PATTERNS = [
-    /^\/_next\/static\//,
     /^\/favicon\.ico$/,
     /^\/robots\.txt$/,
     /^\/sitemap\.xml$/,
-    /^\/[^\/]+\.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$/,
+    /^\/[^/]+\.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$/,
 ];
 
+// App Router metadata routes are rendered by the server, not uploaded to
+// blob storage, so they must not be redirected even though they look like
+// asset paths.
+const METADATA_ROUTE_PATTERN = /^\/(opengraph-image|twitter-image|icon\d*|apple-icon\d*|manifest)\.[a-z0-9]+$/;
+
+// Root-level files actually uploaded to the assets container, written by
+// the build into static-assets.json next to this bundle. Filename patterns
+// can't tell an uploaded public/sitemap.xml from a server-rendered
+// app/sitemap.ts; the manifest can.
+let uploadedRootAssets: Set<string> | null = null;
+try {
+    const manifest = JSON.parse(readFileSync("static-assets.json", "utf8"));
+    if (Array.isArray(manifest)) {
+        uploadedRootAssets = new Set(manifest);
+    }
+} catch {
+    // No manifest (older build): fall back to pattern matching.
+}
+
 function isStaticAssetRequest(pathname: string): boolean {
+    if (pathname.startsWith("/_next/static/")) {
+        return true;
+    }
+    if (uploadedRootAssets) {
+        const isRootLevel = pathname.startsWith("/") && !pathname.slice(1).includes("/");
+        return isRootLevel && uploadedRootAssets.has(pathname.slice(1));
+    }
+    if (METADATA_ROUTE_PATTERN.test(pathname)) {
+        return false;
+    }
     return STATIC_ASSET_PATTERNS.some(pattern => pattern.test(pathname));
+}
+
+/**
+ * Parses a Set-Cookie header string into the structured Cookie object the
+ * Azure Functions v3 http output binding expects (`context.res.cookies`).
+ * The v3 model has no other way to emit multiple Set-Cookie headers, and
+ * comma-joining them corrupts cookies (RFC 6265).
+ */
+export function parseSetCookie(setCookie: string): Record<string, unknown> | null {
+    const parts = setCookie.split(";");
+    const [nameValue, ...attrs] = parts;
+    const eq = nameValue.indexOf("=");
+    if (eq === -1) return null;
+    const cookie: Record<string, unknown> = {
+        name: nameValue.slice(0, eq).trim(),
+        value: nameValue.slice(eq + 1).trim(),
+    };
+    for (const attr of attrs) {
+        const [rawKey, ...rawVal] = attr.split("=");
+        const key = rawKey.trim().toLowerCase();
+        const value = rawVal.join("=").trim();
+        switch (key) {
+            case "expires": {
+                // An Invalid Date or NaN would fail the worker's RPC
+                // conversion and 500 the whole response; drop the bad
+                // attribute instead.
+                const expires = new Date(value);
+                if (!Number.isNaN(expires.getTime())) {
+                    cookie.expires = expires;
+                }
+                break;
+            }
+            case "max-age": {
+                const maxAge = Number(value);
+                if (!Number.isNaN(maxAge)) {
+                    cookie.maxAge = maxAge;
+                }
+                break;
+            }
+            case "domain":
+                cookie.domain = value;
+                break;
+            case "path":
+                cookie.path = value;
+                break;
+            case "samesite":
+                cookie.sameSite = value;
+                break;
+            case "secure":
+                cookie.secure = true;
+                break;
+            case "httponly":
+                cookie.httpOnly = true;
+                break;
+        }
+    }
+    return cookie;
 }
 
 /**
@@ -30,9 +116,10 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
         try {
             const internalEvent = await converter.convertFrom(request);
 
-            // Redirect static assets directly to blob storage
-            // (Front Door URL rewrite doesn't work reliably with blob containers)
-            if (isStaticAssetRequest(internalEvent.rawPath)) {
+            // Redirect static assets directly to blob storage.
+            // Without the account name the redirect target would be
+            // https://undefined.blob..., so fall through to the server.
+            if (isStaticAssetRequest(internalEvent.rawPath) && process.env.AZURE_STORAGE_ACCOUNT_NAME) {
                 const blobUrl = `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/assets${internalEvent.rawPath}`;
 
                 const cacheControl = internalEvent.rawPath.startsWith("/_next/static/")
@@ -61,15 +148,15 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                     const { statusCode, cookies, headers } = prelude;
 
                     const responseHeaders: Record<string, string> = { ...headers };
-
-                    if (cookies.length > 0) {
-                        responseHeaders["set-cookie"] = cookies.join(", ");
-                    }
+                    // Set-Cookie cannot be comma-folded into one header
+                    // (RFC 6265); the v3 binding takes structured cookies.
+                    const responseCookies = cookies.map(parseSetCookie).filter(Boolean);
 
                     if (NULL_BODY_STATUSES.has(statusCode)) {
                         context.res = {
                             status: statusCode,
                             headers: responseHeaders,
+                            ...(responseCookies.length > 0 ? { cookies: responseCookies } : {}),
                         };
 
                         return new Writable({
@@ -91,21 +178,29 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                             callback();
                         },
                         final(callback) {
-                            const body = Buffer.concat(chunks);
-                            const bodyString = body.toString("utf8");
-
+                            // Pass raw bytes through. Decoding to utf8 corrupts
+                            // binary and compressed responses.
                             context.res = {
                                 status: statusCode,
                                 headers: responseHeaders,
-                                body: bodyString,
+                                ...(responseCookies.length > 0 ? { cookies: responseCookies } : {}),
+                                body: Buffer.concat(chunks),
+                                isRaw: true,
                             };
 
                             callback();
                             resolveStream?.();
                         },
+                        destroy(error, callback) {
+                            // A stream that errors before final() must still
+                            // resolve, or the invocation hangs until the host
+                            // timeout.
+                            resolveStream?.();
+                            callback(error);
+                        },
                     });
                 },
-                retainChunks: true,
+                retainChunks: false,
             };
 
             await handler(internalEvent, { streamCreator });
