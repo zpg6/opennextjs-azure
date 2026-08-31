@@ -26,3 +26,26 @@ describe("AzureBlobIncrementalCache.buildBlobKey", () => {
         expect(key("/index")).toBe("myprefix/build123/index.cache");
     });
 });
+
+// Any well-formed key works: the endpoint refuses connections before auth.
+const dummyKey = Buffer.alloc(64, 7).toString("base64");
+const unreachableConnectionString = `DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=${dummyKey};BlobEndpoint=http://127.0.0.1:1/devstoreaccount1;`;
+
+describe("AzureBlobIncrementalCache fail-open", () => {
+    // A storage outage must degrade to cache misses, not 500 every request.
+    it("get() returns null when storage is unreachable", async () => {
+        process.env.NEXT_BUILD_ID = "build123";
+        process.env.AZURE_STORAGE_CONNECTION_STRING = unreachableConnectionString;
+        const cache = new AzureBlobIncrementalCache();
+        await expect(cache.get("/index")).resolves.toBeNull();
+        delete process.env.AZURE_STORAGE_CONNECTION_STRING;
+    }, 20000);
+
+    it("set() rejects when storage is unreachable, so callers see the failure", async () => {
+        process.env.NEXT_BUILD_ID = "build123";
+        process.env.AZURE_STORAGE_CONNECTION_STRING = unreachableConnectionString;
+        const cache = new AzureBlobIncrementalCache();
+        await expect(cache.set("/index", { type: "route", body: "x" } as never)).rejects.toBeTruthy();
+        delete process.env.AZURE_STORAGE_CONNECTION_STRING;
+    }, 20000);
+});

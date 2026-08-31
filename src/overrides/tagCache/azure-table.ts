@@ -186,6 +186,9 @@ class AzureTableTagCache implements OriginalTagCache {
 
         if (failures.length > 0) {
             process.stderr.write(`Failed to write ${failures.length}/${tags.length} tag pairs to Azure Table: ${failures[0]}\n`);
+            // Throwing is intentional: reads fail open (stale page, cache
+            // miss), but a revalidation that didn't persist must not report
+            // success to the app.
             throw failures[0];
         }
     }
