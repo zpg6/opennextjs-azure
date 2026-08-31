@@ -137,7 +137,7 @@ async function checkAzureCLI(): Promise<HealthCheckResult> {
 
 async function checkAzureAuth(): Promise<HealthCheckResult> {
     try {
-        const { stdout } = await execAsync("az account show --query '{Name:name, Id:id, State:state}' -o json");
+        const { stdout } = await execAsync(`az account show --query "{Name:name, Id:id, State:state}" -o json`);
         const account = JSON.parse(stdout);
 
         if (account.State !== "Enabled") {
@@ -165,7 +165,7 @@ async function checkAzureAuth(): Promise<HealthCheckResult> {
 async function checkResourceGroup(resourceGroup: string): Promise<HealthCheckResult> {
     try {
         const { stdout } = await execAsync(
-            `az group show --name ${resourceGroup} --query '{Location:location, State:properties.provisioningState}' -o json`
+            `az group show --name ${resourceGroup} --query "{Location:location, State:properties.provisioningState}" -o json`
         );
         const rg = JSON.parse(stdout);
 
@@ -214,13 +214,13 @@ async function checkStorageAccount(
         // Verify static assets have correct cache headers by checking first _next/static file
         try {
             const { stdout: staticFileStdout } = await execAsync(
-                `az storage blob list --account-name ${account.Name} --container-name assets --prefix _next/static --query '[0].name' -o tsv --only-show-errors 2>/dev/null || echo ""`
+                `az storage blob list --account-name ${account.Name} --container-name assets --prefix _next/static --query "[0].name" -o tsv --only-show-errors 2>/dev/null || echo ""`
             );
             const sampleFile = staticFileStdout.trim();
 
             if (sampleFile) {
                 const { stdout: cacheStdout } = await execAsync(
-                    `az storage blob show --account-name ${account.Name} --container-name assets --name '${sampleFile}' --query 'properties.contentSettings.cacheControl' -o tsv --only-show-errors 2>/dev/null || echo ""`
+                    `az storage blob show --account-name ${account.Name} --container-name assets --name "${sampleFile}" --query "properties.contentSettings.cacheControl" -o tsv --only-show-errors 2>/dev/null || echo ""`
                 );
                 const cacheControl = cacheStdout.trim();
 
@@ -260,7 +260,7 @@ async function checkFunctionApp(
 
     try {
         const { stdout } = await execAsync(
-            `az functionapp show --resource-group ${resourceGroup} --name ${functionAppName} --query '{Name:name, State:state, Kind:kind}' -o json`
+            `az functionapp show --resource-group ${resourceGroup} --name ${functionAppName} --query "{Name:name, State:state, Kind:kind}" -o json`
         );
         const funcApp = JSON.parse(stdout);
 
@@ -287,7 +287,7 @@ async function checkAppServicePlan(
 
     try {
         const { stdout } = await execAsync(
-            `az appservice plan show --resource-group ${resourceGroup} --name ${planName} --query '{Name:name, Sku:sku.name, Tier:sku.tier, Status:properties.status}' -o json`
+            `az appservice plan show --resource-group ${resourceGroup} --name ${planName} --query "{Name:name, Sku:sku.name, Tier:sku.tier, Status:properties.status}" -o json`
         );
         const plan = JSON.parse(stdout);
 
@@ -322,7 +322,7 @@ async function checkFunctionAppStatus(
 
     try {
         const { stdout } = await execAsync(
-            `az functionapp show --resource-group ${resourceGroup} --name ${functionAppName} --query '{State:state, DefaultHostName:defaultHostName, OutboundIpAddresses:outboundIpAddresses}' -o json`
+            `az functionapp show --resource-group ${resourceGroup} --name ${functionAppName} --query "{State:state, DefaultHostName:defaultHostName, OutboundIpAddresses:outboundIpAddresses}" -o json`
         );
         const funcApp = JSON.parse(stdout);
 
@@ -450,7 +450,7 @@ async function checkApplicationInsights(
 
     try {
         const { stdout } = await execAsync(
-            `az monitor app-insights component show --app ${insightsName} --resource-group ${resourceGroup} --query '{Name:name, ApplicationType:applicationType, ProvisioningState:provisioningState}' -o json`
+            `az monitor app-insights component show --app ${insightsName} --resource-group ${resourceGroup} --query "{Name:name, ApplicationType:applicationType, ProvisioningState:provisioningState}" -o json`
         );
         const insights = JSON.parse(stdout);
 

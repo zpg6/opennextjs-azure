@@ -6,6 +6,15 @@ import { greenCheck } from "./log.js";
 
 const execAsync = promisify(exec);
 
+async function exists(p: string): Promise<boolean> {
+    try {
+        await fs.access(p);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /** Reads the version of a dependency installed in the app's node_modules. */
 async function readInstalledVersion(dep: string): Promise<string | null> {
     try {
@@ -94,90 +103,11 @@ export async function prepareFunctions(): Promise<void> {
 
     await fs.writeFile(path.join(functionsDir, "host.json"), JSON.stringify(hostJson, null, 2));
 
-    // Create root path handler (/)
-    const rootDir = path.join(functionsDir, "root");
-    await fs.mkdir(rootDir, { recursive: true });
-
-    const rootFunctionJson = {
-        bindings: [
-            {
-                authLevel: "anonymous",
-                type: "httpTrigger",
-                direction: "in",
-                name: "req",
-                methods: ["get", "post", "put", "delete", "patch", "head", "options"],
-                route: "",
-            },
-            {
-                type: "http",
-                direction: "out",
-                name: "res",
-            },
-        ],
-        scriptFile: "../index.mjs",
-        entryPoint: "handler",
-    };
-
-    await fs.writeFile(path.join(rootDir, "function.json"), JSON.stringify(rootFunctionJson, null, 2));
-
-    // Create catch-all handler for all other paths
-    const functionDir = path.join(functionsDir, "server");
-    await fs.mkdir(functionDir, { recursive: true });
-
-    const functionJson = {
-        bindings: [
-            {
-                authLevel: "anonymous",
-                type: "httpTrigger",
-                direction: "in",
-                name: "req",
-                methods: ["get", "post", "put", "delete", "patch", "head", "options"],
-                route: "{*path}",
-            },
-            {
-                type: "http",
-                direction: "out",
-                name: "res",
-            },
-        ],
-        scriptFile: "../index.mjs",
-        entryPoint: "handler",
-    };
-
-    await fs.writeFile(path.join(functionDir, "function.json"), JSON.stringify(functionJson, null, 2));
-
     // Add image optimization function if it exists
     const imageOptDir = path.join(process.cwd(), ".open-next/image-optimization-function");
     try {
         await fs.access(imageOptDir);
         console.log("  Adding image optimization function...");
-
-        // Create image-optimization directory in the Functions app
-        const imageFunctionDir = path.join(functionsDir, "image-optimization");
-        await fs.mkdir(imageFunctionDir, { recursive: true });
-
-        // Create function.json for image optimization route
-        const imageFunctionJson = {
-            bindings: [
-                {
-                    authLevel: "anonymous",
-                    type: "httpTrigger",
-                    direction: "in",
-                    name: "req",
-                    methods: ["get", "head"],
-                    route: "_next/image",
-                },
-                {
-                    type: "http",
-                    direction: "out",
-                    name: "res",
-                },
-            ],
-            scriptFile: "../index-image.mjs",
-            entryPoint: "handler",
-        };
-
-        await fs.writeFile(path.join(imageFunctionDir, "function.json"), JSON.stringify(imageFunctionJson, null, 2));
 
         // Copy the image optimization handler as index-image.mjs
         await fs.copyFile(path.join(imageOptDir, "index.mjs"), path.join(functionsDir, "index-image.mjs"));
@@ -211,48 +141,68 @@ export async function prepareFunctions(): Promise<void> {
         await fs.access(path.join(revalidationDir, "index.mjs"));
         console.log("  Adding revalidation queue consumer...");
 
-        const revalidateFunctionDir = path.join(functionsDir, "revalidate");
-        await fs.mkdir(revalidateFunctionDir, { recursive: true });
-
-        const revalidateFunctionJson = {
-            bindings: [
-                {
-                    type: "queueTrigger",
-                    direction: "in",
-                    name: "queueItem",
-                    // Binding expression: resolves the AZURE_QUEUE_NAME app
-                    // setting (set by the bicep template), so the consumer
-                    // follows the same queue the producer writes to.
-                    queueName: "%AZURE_QUEUE_NAME%",
-                    connection: "AZURE_STORAGE_CONNECTION_STRING",
-                },
-            ],
-            scriptFile: "../index-revalidate.mjs",
-            entryPoint: "handler",
-        };
-        await fs.writeFile(
-            path.join(revalidateFunctionDir, "function.json"),
-            JSON.stringify(revalidateFunctionJson, null, 2)
-        );
-        await fs.copyFile(path.join(revalidationDir, "index.mjs"), path.join(functionsDir, "index-revalidate.mjs"));
-
-        // The revalidation handler reads prerender-manifest.json (for the
+        // Manifest first: if it is missing, the handler must not be copied
+        // either, or the entry would register a consumer that fails on
+        // every message. The handler reads prerender-manifest.json (for the
         // previewModeId it sends as x-prerender-revalidate) from the cwd.
         await fs.copyFile(
             path.join(revalidationDir, "prerender-manifest.json"),
             path.join(functionsDir, "prerender-manifest.json")
         );
+        await fs.copyFile(path.join(revalidationDir, "index.mjs"), path.join(functionsDir, "index-revalidate.mjs"));
 
         console.log(`  ${greenCheck()} Revalidation queue consumer added`);
     } catch {
         // No revalidation function emitted, skip
     }
 
+    // v4 programming model entry point: registers every function in code.
+    // enableHttpStream makes SSR responses stream instead of buffering.
+    const hasImage = await exists(path.join(functionsDir, "index-image.mjs"));
+    const hasRevalidate = await exists(path.join(functionsDir, "index-revalidate.mjs"));
+
+    const entryLines = [
+        `import { app } from "@azure/functions";`,
+        `import { handler as server } from "./index.mjs";`,
+    ];
+    if (hasImage) entryLines.push(`import { handler as image } from "./index-image.mjs";`);
+    if (hasRevalidate) entryLines.push(`import { handler as revalidate } from "./index-revalidate.mjs";`);
+    entryLines.push(
+        ``,
+        `app.setup({ enableHttpStream: true });`,
+        ``,
+        `const methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];`,
+        ``,
+        `// A {*path} catch-all does not match the empty path, so root is separate.`,
+        `app.http("root", { methods, authLevel: "anonymous", route: "", handler: server });`,
+        `app.http("server", { methods, authLevel: "anonymous", route: "{*path}", handler: server });`
+    );
+    if (hasImage) {
+        entryLines.push(
+            `app.http("imageOptimization", { methods: ["GET", "HEAD"], authLevel: "anonymous", route: "_next/image", handler: image });`
+        );
+    }
+    if (hasRevalidate) {
+        entryLines.push(
+            ``,
+            `// %AZURE_QUEUE_NAME% resolves the app setting, so the consumer follows`,
+            `// the queue the producer writes to.`,
+            `app.storageQueue("revalidate", {`,
+            `    queueName: "%AZURE_QUEUE_NAME%",`,
+            `    connection: "AZURE_STORAGE_CONNECTION_STRING",`,
+            `    handler: revalidate,`,
+            `});`
+        );
+    }
+    await fs.writeFile(path.join(functionsDir, "entry.mjs"), entryLines.join("\n") + "\n");
+
     console.log(`  ${greenCheck()} Azure Functions metadata created`);
 
     console.log("Installing minimal runtime dependencies...");
     try {
-        const originalPackageJson = JSON.parse(await fs.readFile(path.join(functionsDir, "package.json"), "utf-8"));
+        // Read the app's own package.json: OpenNext 4.x no longer copies one
+        // into the bundle.
+        const originalPackageJson = JSON.parse(await fs.readFile(path.join(process.cwd(), "package.json"), "utf-8"));
 
         // Install all of the app's production dependencies. Server code may
         // import any of them at runtime (ORMs, SDKs). Specs npm can't
@@ -275,14 +225,25 @@ export async function prepareFunctions(): Promise<void> {
             }
             runtimeDependencies[dep] = spec;
         }
-        runtimeDependencies.next ||= "latest";
-        runtimeDependencies.react ||= "latest";
-        runtimeDependencies["react-dom"] ||= "latest";
+        for (const core of ["next", "react", "react-dom"]) {
+            if (!runtimeDependencies[core]) {
+                console.warn(
+                    `  Warning: "${core}" not found in ${path.join(process.cwd(), "package.json")}; ` +
+                        `installing "latest" into the bundle, which may not match the version the app was built with.`
+                );
+                runtimeDependencies[core] = "latest";
+            }
+        }
+
+        // The v4 model discovers functions through "main"; @azure/functions
+        // must be installed in the bundle for the entry's app registration.
+        runtimeDependencies["@azure/functions"] = runtimeDependencies["@azure/functions"] || "^4.8.0";
 
         const minimalPackageJson = {
             name: originalPackageJson.name || "nextjs-app",
             version: originalPackageJson.version || "1.0.0",
             private: true,
+            main: "entry.mjs",
             dependencies: runtimeDependencies,
         };
 

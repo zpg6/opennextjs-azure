@@ -178,7 +178,7 @@ async function checkQuotaAvailability(location: string, environment: string): Pr
     console.log("Checking Azure quota availability...");
 
     try {
-        const { stdout: subscriptionId } = await execAsync("az account show --query id -o tsv");
+        const { stdout: subscriptionId } = await execAsync(`az account show --query id -o tsv`);
         const subId = subscriptionId.trim();
 
         const { stdout: quotaJson } = await execAsync(
@@ -250,7 +250,7 @@ async function checkAzureSubscriptionPermissions(): Promise<void> {
     console.log("Checking Azure subscription permissions...");
 
     try {
-        const { stdout } = await execAsync("az account show --query '{Name:name, Id:id, State:state}' -o json");
+        const { stdout } = await execAsync(`az account show --query "{Name:name, Id:id, State:state}" -o json`);
         const account = JSON.parse(stdout);
 
         if (account.State !== "Enabled") {
@@ -274,7 +274,7 @@ async function checkLocation(location: string): Promise<void> {
 
         if (locations.length === 0) {
             const { stdout: available } = await execAsync(
-                "az account list-locations --query \"[?metadata.regionCategory=='Recommended'].name\" -o tsv"
+                `az account list-locations --query "[?metadata.regionCategory=='Recommended'].name" -o tsv`
             );
             throw new Error(
                 `Invalid location: ${location}\nAvailable regions: ${available.trim().split("\n").slice(0, 10).join(", ")}`
@@ -368,7 +368,7 @@ async function performPostflightChecks(
     console.log("Performing post-deployment verification...");
 
     try {
-        const { stdout: subIdStdout } = await execAsync("az account show --query id -o tsv");
+        const { stdout: subIdStdout } = await execAsync(`az account show --query id -o tsv`);
         const subscriptionId = subIdStdout.trim();
 
         const { stdout: funcStdout } = await execAsync(
@@ -486,7 +486,7 @@ async function provisionInfrastructure(options: {
       --resource-group ${resourceGroup} \
       --template-file "${bicepPath}" \
       --parameters appName=${appName} environment=${environment} enableApplicationInsights=${enableAppInsights} \
-      --query 'properties.outputs.deploymentInfo.value' \
+      --query "properties.outputs.deploymentInfo.value" \
       --output json`
     );
 
@@ -537,11 +537,15 @@ async function readRunFromPackage(resourceGroup: string, functionAppName: string
     }
 }
 
-async function seedRuntimeCaches(resourceGroup: string, storageAccountName: string): Promise<void> {
-    const { stdout: connectionString } = await execAsync(
+async function getConnectionString(resourceGroup: string, storageAccountName: string): Promise<string> {
+    const { stdout } = await execAsync(
         `az storage account show-connection-string --resource-group ${resourceGroup} --name ${storageAccountName} --query connectionString -o tsv`
     );
-    await seedCacheAssets(connectionString.trim());
+    return stdout.trim();
+}
+
+async function seedRuntimeCaches(resourceGroup: string, storageAccountName: string): Promise<void> {
+    await seedCacheAssets(await getConnectionString(resourceGroup, storageAccountName));
 }
 
 async function uploadStaticAssets(storageAccountName: string): Promise<void> {
@@ -585,7 +589,15 @@ async function deployFunctionApp(functionAppName: string, resourceGroup: string)
     // "zip -r" merges into an existing archive, so a leftover zip from a
     // failed deploy would bring back files deleted since the last build.
     await fs.rm(zipPath, { force: true });
-    await execAsync(`cd "${functionsPath}" && zip -r "${zipPath}" . -q`, {
+    // Windows has no zip binary, and bsdtar writes "./"-prefixed entry
+    // names that break run-from-package. Compress-Archive writes plain
+    // root-relative names. (The Windows deploy path builds in CI but has
+    // not been exercised against a real function app.)
+    const zipCommand =
+        process.platform === "win32"
+            ? `powershell -NoProfile -Command "Compress-Archive -Path '${functionsPath}\\*' -DestinationPath '${zipPath}' -Force"`
+            : `cd "${functionsPath}" && zip -r "${zipPath}" . -q`;
+    await execAsync(zipCommand, {
         maxBuffer: 100 * 1024 * 1024,
     });
 

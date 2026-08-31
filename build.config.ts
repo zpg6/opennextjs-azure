@@ -5,6 +5,7 @@ export default defineBuildConfig({
         "src/index",
         "src/cli/index",
         "src/config/index",
+        "src/deploy/seed-cache",
         "src/overrides/incrementalCache/azure-blob",
         "src/overrides/tagCache/azure-table",
         "src/overrides/queue/azure-queue",

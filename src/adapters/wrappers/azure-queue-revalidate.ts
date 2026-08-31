@@ -2,7 +2,7 @@ import type { WrapperHandler } from "@opennextjs/aws/types/overrides.js";
 
 /**
  * Azure Functions wrapper for the OpenNext revalidation consumer
- * (v3 model, queueTrigger binding on the revalidation queue).
+ * (v4 programming model: handler receives (queueItem, context)).
  *
  * The core handler re-requests each stale page with the
  * `x-prerender-revalidate` header so Next.js regenerates it and the
@@ -12,7 +12,7 @@ import type { WrapperHandler } from "@opennextjs/aws/types/overrides.js";
  */
 const handler: WrapperHandler<any, any> =
     async (handler, converter) =>
-    async (context: any, queueItem: unknown): Promise<void> => {
+    async (queueItem: unknown, context: any): Promise<void> => {
         const event = await converter.convertFrom(queueItem);
         const result = await handler(event);
 

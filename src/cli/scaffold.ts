@@ -45,7 +45,7 @@ export async function scaffoldProject(targetDir: string, options: ScaffoldOption
         .filter(Boolean)
         .join(" ");
 
-    await execAsync(`npx create-next-app@15 ${targetDir} ${flags}`, { cwd: path.dirname(targetDir) });
+    await execAsync(`npx create-next-app@16 ${targetDir} ${flags}`, { cwd: path.dirname(targetDir) });
 
     console.log("Next.js project created\n");
 

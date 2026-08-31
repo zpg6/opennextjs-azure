@@ -1,6 +1,6 @@
 import type { InternalEvent, InternalResult, StreamCreator } from "@opennextjs/aws/types/open-next.js";
 import type { Wrapper, WrapperHandler } from "@opennextjs/aws/types/overrides.js";
-import { Writable } from "node:stream";
+import { PassThrough, Writable } from "node:stream";
 import { readFileSync } from "node:fs";
 
 // HTTP status codes that should not have a response body
@@ -90,9 +90,15 @@ export function parseSetCookie(setCookie: string): Record<string, unknown> | nul
             case "path":
                 cookie.path = value;
                 break;
-            case "samesite":
-                cookie.sameSite = value;
+            case "samesite": {
+                // The platform's cookie serializer throws on values outside
+                // this set, which would fail the whole response.
+                const sameSite = { lax: "Lax", strict: "Strict", none: "None" }[value.toLowerCase()];
+                if (sameSite) {
+                    cookie.sameSite = sameSite;
+                }
                 break;
+            }
             case "secure":
                 cookie.secure = true;
                 break;
@@ -105,41 +111,53 @@ export function parseSetCookie(setCookie: string): Record<string, unknown> | nul
 }
 
 /**
- * Azure Functions wrapper for OpenNext (v3 model - function.json based).
+ * Azure Functions wrapper for OpenNext (v4 programming model).
  *
- * Adapts the Azure Functions runtime to work with OpenNext's internal event/result format.
- * Uses v3 signature: async (context, request) with context.res for response.
+ * The handler receives (request, context) and returns an HttpResponseInit.
+ * With enableHttpStream on (set in the generated entry file), the response
+ * body is a stream: headers go out as soon as OpenNext writes them and the
+ * body streams while Next renders, so SSR/RSC responses have real
+ * time-to-first-byte instead of waiting for the full render.
  */
 const handler: WrapperHandler<InternalEvent, InternalResult> =
     async (handler, converter) =>
-    async (context: any, request: any): Promise<void> => {
+    async (request: any, context: any): Promise<Record<string, unknown>> => {
+        let internalEvent: InternalEvent;
         try {
-            const internalEvent = await converter.convertFrom(request);
+            internalEvent = await converter.convertFrom(request);
+        } catch (error) {
+            return errorResponse(error);
+        }
 
-            // Redirect static assets directly to blob storage.
-            // Without the account name the redirect target would be
-            // https://undefined.blob..., so fall through to the server.
-            if (isStaticAssetRequest(internalEvent.rawPath) && process.env.AZURE_STORAGE_ACCOUNT_NAME) {
-                const blobUrl = `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/assets${internalEvent.rawPath}`;
+        // Redirect static assets directly to blob storage.
+        // Without the account name the redirect target would be
+        // https://undefined.blob..., so fall through to the server.
+        if (isStaticAssetRequest(internalEvent.rawPath) && process.env.AZURE_STORAGE_ACCOUNT_NAME) {
+            const blobUrl = `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/assets${internalEvent.rawPath}`;
 
-                const cacheControl = internalEvent.rawPath.startsWith("/_next/static/")
-                    ? "public, max-age=31536000, immutable"
-                    : "public, max-age=0, must-revalidate";
+            const cacheControl = internalEvent.rawPath.startsWith("/_next/static/")
+                ? "public, max-age=31536000, immutable"
+                : "public, max-age=0, must-revalidate";
 
-                context.res = {
-                    status: 301,
-                    headers: {
-                        Location: blobUrl,
-                        "Cache-Control": cacheControl,
-                    },
-                };
-                return;
-            }
+            return {
+                status: 301,
+                headers: {
+                    Location: blobUrl,
+                    "Cache-Control": cacheControl,
+                },
+            };
+        }
 
-            let streamFinished: Promise<void> | null = null;
-            let resolveStream: (() => void) | null = null;
+        return await new Promise<Record<string, unknown>>(resolve => {
+            let resolved = false;
+            let bodyStream: PassThrough | null = null;
+            // Best-effort abort: the platform gives no client-disconnect
+            // signal, so this only fires when the response stream dies
+            // abnormally on our side.
+            const abortController = new AbortController();
 
             const streamCreator: StreamCreator = {
+                abortSignal: abortController.signal,
                 writeHeaders(prelude: {
                     statusCode: number;
                     cookies: string[];
@@ -149,15 +167,16 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
 
                     const responseHeaders: Record<string, string> = { ...headers };
                     // Set-Cookie cannot be comma-folded into one header
-                    // (RFC 6265); the v3 binding takes structured cookies.
+                    // (RFC 6265); the binding takes structured cookies.
                     const responseCookies = cookies.map(parseSetCookie).filter(Boolean);
 
                     if (NULL_BODY_STATUSES.has(statusCode)) {
-                        context.res = {
+                        resolved = true;
+                        resolve({
                             status: statusCode,
                             headers: responseHeaders,
                             ...(responseCookies.length > 0 ? { cookies: responseCookies } : {}),
-                        };
+                        });
 
                         return new Writable({
                             write(chunk, encoding, callback) {
@@ -166,75 +185,80 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                         });
                     }
 
-                    const chunks: Buffer[] = [];
-
-                    streamFinished = new Promise(resolve => {
-                        resolveStream = resolve;
+                    // Hand the platform a live stream: the response starts
+                    // now, and OpenNext keeps writing into it. No backpressure:
+                    // the platform proxy reads at producer speed, so a slow
+                    // client buffers the body in worker memory.
+                    bodyStream = new PassThrough();
+                    bodyStream.on("close", () => {
+                        if (bodyStream && !bodyStream.writableFinished) {
+                            abortController.abort();
+                        }
+                    });
+                    resolved = true;
+                    resolve({
+                        status: statusCode,
+                        headers: responseHeaders,
+                        ...(responseCookies.length > 0 ? { cookies: responseCookies } : {}),
+                        body: bodyStream,
                     });
 
-                    return new Writable({
-                        write(chunk: Buffer, encoding, callback) {
-                            chunks.push(chunk);
-                            callback();
-                        },
-                        final(callback) {
-                            // Pass raw bytes through. Decoding to utf8 corrupts
-                            // binary and compressed responses.
-                            context.res = {
-                                status: statusCode,
-                                headers: responseHeaders,
-                                ...(responseCookies.length > 0 ? { cookies: responseCookies } : {}),
-                                body: Buffer.concat(chunks),
-                                isRaw: true,
-                            };
-
-                            callback();
-                            resolveStream?.();
-                        },
-                        destroy(error, callback) {
-                            // A stream that errors before final() must still
-                            // resolve, or the invocation hangs until the host
-                            // timeout.
-                            resolveStream?.();
-                            callback(error);
-                        },
-                    });
+                    return bodyStream;
                 },
                 retainChunks: false,
             };
 
-            await handler(internalEvent, { streamCreator });
-
-            // Wait for the stream to finish writing to context.res
-            if (streamFinished) {
-                await streamFinished;
-            }
-
-            if (!context.res) {
-                context.res = {
-                    status: 200,
-                    headers: { "content-type": "text/html" },
-                    body: "",
-                };
-            }
-        } catch (error) {
-            const isProduction = process.env.NODE_ENV === "production";
-
-            context.res = {
-                status: 500,
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    error: "Internal Server Error",
-                    ...(isProduction
-                        ? {}
-                        : {
-                              message: error instanceof Error ? error.message : String(error),
-                              stack: error instanceof Error ? error.stack : undefined,
-                          }),
-                }),
-            };
-        }
+            handler(internalEvent, { streamCreator })
+                .then(() => {
+                    if (!resolved) {
+                        // writeHeaders never ran (known HEAD-request race in
+                        // the core): send an empty 200.
+                        resolved = true;
+                        resolve({
+                            status: 200,
+                            headers: { "content-type": "text/html" },
+                            body: "",
+                        });
+                    } else if (bodyStream && !bodyStream.writableEnded && !bodyStream.destroyed) {
+                        // The handler finished without ending the stream (a
+                        // destroyed source doesn't end its pipe target). An
+                        // unended stream holds the invocation open until the
+                        // host timeout.
+                        bodyStream.end();
+                    }
+                })
+                .catch(error => {
+                    if (!resolved) {
+                        resolved = true;
+                        resolve(errorResponse(error));
+                    } else if (bodyStream && !bodyStream.writableEnded && !bodyStream.destroyed) {
+                        // Headers are gone. End (not destroy) the stream: the
+                        // platform flushes a truncated body and completes the
+                        // invocation; destroying leaves its reader dangling.
+                        bodyStream.end();
+                    }
+                });
+        });
     };
+
+function errorResponse(error: unknown): Record<string, unknown> {
+    // Fail closed: details only when explicitly in development, not
+    // whenever NODE_ENV isn't the exact string "production".
+    const showDetails = process.env.NODE_ENV === "development";
+    return {
+        status: 500,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+            error: "Internal Server Error",
+            ...(!showDetails
+                ? {}
+                : {
+                      message: error instanceof Error ? error.message : String(error),
+                      stack: error instanceof Error ? error.stack : undefined,
+                  }),
+        }),
+    };
+}
 
 export default {
     wrapper: handler,

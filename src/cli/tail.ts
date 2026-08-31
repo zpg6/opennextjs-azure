@@ -109,7 +109,7 @@ async function openPortalLogStream(appName: string, resourceGroup: string, envir
     console.log(`📡 Opening Azure Portal Log Stream for ${functionAppName}...\n`);
 
     try {
-        const { stdout } = await execAsync("az account show --query '{tenant:tenantId, subscription:id}' -o json");
+        const { stdout } = await execAsync(`az account show --query "{tenant:tenantId, subscription:id}" -o json`);
         const account = JSON.parse(stdout);
 
         const portalUrl = `https://portal.azure.com/#@${account.tenant}/resource/subscriptions/${account.subscription}/resourceGroups/${resourceGroup}/providers/Microsoft.Web/sites/${functionAppName}/logStream`;

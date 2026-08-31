@@ -20,6 +20,14 @@ function getBlobClient(key: string): BlockBlobClient {
         if (!AZURE_STORAGE_CONNECTION_STRING && !AZURE_STORAGE_ACCOUNT_NAME) {
             throw new Error("Azure Storage connection string or account name must be defined");
         }
+        if (!AZURE_STORAGE_CONNECTION_STRING) {
+            // Anonymous client: the optimized-images container is private,
+            // so every cache read/write will fail (each is swallowed as a
+            // miss). Say it once instead of failing silently per request.
+            process.stderr.write(
+                "[ImageCache] AZURE_STORAGE_CONNECTION_STRING is not set; image caching is disabled\n"
+            );
+        }
         const blobServiceClient = AZURE_STORAGE_CONNECTION_STRING
             ? BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING, BLOB_RETRY_OPTIONS)
             : new BlobServiceClient(
@@ -102,14 +110,13 @@ async function setCachedImage(cacheKey: string, buffer: Buffer, contentType: str
 }
 
 /**
- * Azure Functions wrapper for Image Optimization (v3 model - function.json based).
- *
- * Adapts the Azure Functions runtime to work with OpenNext's image optimization handler.
- * Uses v3 signature: async (context, request) with context.res for response.
+ * Azure Functions wrapper for image optimization (v4 programming model).
+ * Responses are buffered, not streamed: the whole image is needed anyway to
+ * write the cache entry.
  */
 const handler: WrapperHandler<InternalEvent, InternalResult> =
     async (handler, converter) =>
-    async (context: any, request: any): Promise<void> => {
+    async (request: any, context: any): Promise<Record<string, unknown>> => {
         try {
             const internalEvent = await converter.convertFrom(request);
 
@@ -117,7 +124,7 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
             const cacheKey = computeCacheKey(internalEvent);
             const cached = await getCachedImage(cacheKey);
             if (cached) {
-                context.res = {
+                return {
                     status: 200,
                     headers: {
                         // Serve the stored type; hardcoding webp mislabels
@@ -127,17 +134,13 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                         Vary: "Accept",
                     },
                     body: cached.buffer,
-                    isRaw: true,
                 };
-                return;
             }
-
-            process.stderr.write(`[ImageCache] Cache MISS - processing...\n`);
 
             let streamFinished: Promise<void> | null = null;
             let resolveStream: (() => void) | null = null;
-            let processedBuffer: Buffer | null = null;
-            let responseContentType = "image/webp";
+            let response: Record<string, unknown> | null = null;
+            let toCache: { buffer: Buffer; contentType: string } | null = null;
 
             const streamCreator = {
                 writeHeaders(prelude: {
@@ -147,15 +150,13 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                 }): Writable {
                     const { statusCode, cookies, headers } = prelude;
 
-                    responseContentType = headers["Content-Type"] || headers["content-type"] || "image/webp";
-
                     const responseHeaders: Record<string, string> = { ...headers };
                     // Set-Cookie must not be comma-folded (RFC 6265);
-                    // emit structured cookies via the v3 binding instead.
+                    // emit structured cookies via the binding instead.
                     const responseCookies = cookies.map(parseSetCookie).filter(Boolean);
 
                     if (NULL_BODY_STATUSES.has(statusCode)) {
-                        context.res = {
+                        response = {
                             status: statusCode,
                             headers: responseHeaders,
                             ...(responseCookies.length > 0 ? { cookies: responseCookies } : {}),
@@ -172,7 +173,7 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                     });
 
                     const chunks: Buffer[] = [];
-                    const writable = new Writable({
+                    return new Writable({
                         write(chunk, _encoding, callback) {
                             chunks.push(Buffer.from(chunk));
                             callback();
@@ -182,15 +183,20 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                             // Cache only 200s. A cached error body would
                             // replay as an immutable 200 image forever.
                             if (statusCode === 200) {
-                                processedBuffer = body;
+                                toCache = {
+                                    buffer: body,
+                                    contentType:
+                                        responseHeaders["Content-Type"] ||
+                                        responseHeaders["content-type"] ||
+                                        "image/webp",
+                                };
                             }
                             responseHeaders["Vary"] = "Accept";
-                            context.res = {
+                            response = {
                                 status: statusCode,
                                 headers: responseHeaders,
                                 ...(responseCookies.length > 0 ? { cookies: responseCookies } : {}),
                                 body,
-                                isRaw: true,
                             };
                             callback();
                             resolveStream?.();
@@ -200,9 +206,8 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                             callback(error);
                         },
                     });
-
-                    return writable;
                 },
+                retainChunks: false,
             };
 
             await handler(internalEvent, { streamCreator });
@@ -211,17 +216,24 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
                 await streamFinished;
             }
 
-            // Cache the processed image
-            if (processedBuffer && responseContentType) {
-                await setCachedImage(cacheKey, processedBuffer, responseContentType);
+            // TS can't see the closure writes, hence the cast
+            const cacheEntry = toCache as { buffer: Buffer; contentType: string } | null;
+            if (cacheEntry) {
+                await setCachedImage(cacheKey, cacheEntry.buffer, cacheEntry.contentType);
             }
+
+            return (
+                response ?? {
+                    status: 500,
+                    headers: { "Content-Type": "text/plain" },
+                    body: "Internal server error",
+                }
+            );
         } catch (error: any) {
             console.error("Image optimization error:", error);
-            context.res = {
+            return {
                 status: 500,
-                headers: {
-                    "Content-Type": "text/plain",
-                },
+                headers: { "Content-Type": "text/plain" },
                 body: "Internal server error",
             };
         }
@@ -230,5 +242,5 @@ const handler: WrapperHandler<InternalEvent, InternalResult> =
 export default {
     name: "azure-image-optimization",
     wrapper: handler,
-    supportStreaming: true,
+    supportStreaming: false,
 };

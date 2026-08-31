@@ -23,7 +23,7 @@ program
     .description("Initialize Azure infrastructure in your project")
     .option("--scaffold", "Scaffold a new Next.js project if in empty directory")
     .option("--no-typescript", "Disable TypeScript (default: enabled)")
-    .option("--no-tailwind", "Disable Tailwind CSS (default: enabled with v3)")
+    .option("--no-tailwind", "Disable Tailwind CSS (default: enabled)")
     .option("--no-eslint", "Disable ESLint (default: enabled)")
     .option("--no-src-dir", "Disable src/ directory (default: enabled)")
     .option("--no-app-router", "Use Pages Router instead of App Router")

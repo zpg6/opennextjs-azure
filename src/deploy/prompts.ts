@@ -22,7 +22,7 @@ export async function selectResourceGroup(): Promise<{ name: string; isNew: bool
     console.log("🔍 Fetching your Azure resource groups...\n");
 
     try {
-        const { stdout } = await execAsync("az group list --query '[].{name:name, location:location}' -o json");
+        const { stdout } = await execAsync(`az group list --query "[].{name:name, location:location}" -o json`);
         const groups = JSON.parse(stdout);
 
         if (groups.length === 0) {

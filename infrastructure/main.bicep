@@ -15,7 +15,7 @@ param environment string = 'dev'
 
 @description('Node.js version for Functions')
 @allowed(['20', '22'])
-param nodeVersion string = '20'
+param nodeVersion string = '22'
 
 @description('Enable Application Insights for monitoring and logging')
 param enableApplicationInsights bool = false
@@ -97,11 +97,12 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
       }
     }
 
-    // Container for optimized images (public CDN access)
+    // Container for optimized images. Private: the image function reads and
+    // writes it with the SDK; nothing fetches it over public URLs.
     resource optimizedImagesContainer 'containers' = {
       name: 'optimized-images'
       properties: {
-        publicAccess: 'Blob'
+        publicAccess: 'None'
       }
     }
   }
@@ -230,8 +231,9 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
       // that provisioning must not overwrite.
       minimumElasticInstanceCount: environment == 'prod' ? 1 : null
       preWarmedInstanceCount: environment == 'prod' ? 1 : null
+      // Pages are served same-origin; the function app needs no CORS.
       cors: {
-        allowedOrigins: ['*']
+        allowedOrigins: []
       }
     }
     httpsOnly: true

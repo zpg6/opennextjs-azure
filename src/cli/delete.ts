@@ -47,7 +47,7 @@ export async function deleteResourceGroup(options: {
 
     try {
         const { stdout } = await execAsync(
-            `az group show --name ${resourceGroup} --query '{Location:location, State:properties.provisioningState}' -o json`
+            `az group show --name ${resourceGroup} --query "{Location:location, State:properties.provisioningState}" -o json`
         );
         const rg = JSON.parse(stdout);
 
