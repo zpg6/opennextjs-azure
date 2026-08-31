@@ -1,0 +1,38 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "opennextjs-azure configuration",
+    "description": "Settings for deploying a Next.js app to Azure with opennextjs-azure.",
+    "type": "object",
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "appName": {
+            "type": "string",
+            "description": "Application name, used as the prefix for all Azure resources.",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-]{0,58}[a-zA-Z0-9]$"
+        },
+        "resourceGroup": {
+            "type": "string",
+            "description": "Azure resource group to deploy into. Created if it doesn't exist.",
+            "pattern": "^[a-zA-Z0-9_()\\-.]{1,90}$"
+        },
+        "location": {
+            "type": "string",
+            "description": "Azure region, e.g. eastus or westeurope.",
+            "pattern": "^[a-z0-9]{3,30}$"
+        },
+        "environment": {
+            "type": "string",
+            "description": "Deployment environment. dev and staging use the Consumption plan; prod uses Elastic Premium.",
+            "enum": ["dev", "staging", "prod"]
+        },
+        "applicationInsights": {
+            "type": "boolean",
+            "description": "Provision Application Insights for logs and monitoring.",
+            "default": false
+        }
+    },
+    "required": ["appName", "resourceGroup"],
+    "additionalProperties": false
+}
