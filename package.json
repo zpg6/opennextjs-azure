@@ -1,6 +1,6 @@
 {
     "name": "opennextjs-azure",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "True serverless Next.js on Azure Functions with a Vercel-grade developer experience",
     "type": "module",
     "main": "./dist/index.js",
@@ -80,7 +80,7 @@
         "url": "https://github.com/zpg6/opennextjs-azure/issues"
     },
     "dependencies": {
-        "@opennextjs/aws": "^3.8.5",
+        "@opennextjs/aws": "^4.1.2",
         "@azure/functions": "^4.5.1",
         "@azure/storage-blob": "^12.20.0",
         "@azure/data-tables": "^13.2.2",
@@ -88,7 +88,7 @@
         "commander": "^11.1.0"
     },
     "devDependencies": {
-        "@types/node": "^20.11.0",
+        "@types/node": "^22.10.0",
         "@typescript-eslint/eslint-plugin": "^6.20.0",
         "@typescript-eslint/parser": "^6.20.0",
         "eslint": "^8.56.0",

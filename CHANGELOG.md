@@ -1,11 +1,27 @@
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [Unreleased]
+
+## [0.3.0] - 2026-08-31
+
+### Added
+
+- Azure Functions v4 programming model with real streaming SSR. The build generates an `entry.mjs` that registers all functions in code (`app.http`, `app.storageQueue`) with `enableHttpStream` on, so the response shell reaches the client while Next is still rendering. Measured on Azure: 0.47s to first byte on a page whose full render takes 1.9s.
+- Next 16 support via @opennextjs/aws 4.1.x. The example app runs Next 16.3; `init --scaffold` uses create-next-app@16.
+- Committed e2e harness (`scripts/e2e.sh`) that builds the example, runs it under the real Functions host with Azurite, and asserts the full matrix: HTTP semantics, ISR, on-demand and queue-driven revalidation, and streaming (with a timing assertion). CI runs it on every push.
+
+### Changed
+
+- Default Node runtime is 22 (Node 20 is EOL April 2026; the v3 model didn't run on 22 at all). Existing apps move to Node 22 on their next deploy: if the app has native dependencies, rebuild before deploying.
+- The `optimized-images` container is private; the image function reads and writes it with the SDK. Image caching now requires `AZURE_STORAGE_CONNECTION_STRING` (the default bicep sets it) and warns once when it is missing.
+- Function-app CORS dropped: pages are served same-origin and need none.
+- Error responses include details only when `NODE_ENV=development`, instead of whenever it isn't exactly "production".
+- Windows: az `--query` arguments quoted for cmd, deploy zips with Compress-Archive. Builds pass on the Windows CI leg; a real Windows deploy has not been exercised yet.
+
+### Fixed
+
+- A response stream that was never ended (source destroyed mid-render) held the invocation open until the host timeout. The wrapper now closes it when the handler finishes or fails.
+- `SameSite` cookie values outside Lax/Strict/None made the platform's serializer throw and fail the whole response; they are normalized or dropped.
+- The revalidation consumer copies `prerender-manifest.json` before the handler, so a missing manifest skips the consumer cleanly instead of registering one that poison-queues every message.
+- The bundle installs a loud warning instead of silently pulling `latest` when next/react are missing from the app's package.json.
 
 ## [0.2.0] - 2026-08-30
 
